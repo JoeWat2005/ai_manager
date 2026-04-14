@@ -1,12 +1,15 @@
-import Image from "next/image";
+// app/page.tsx
 import Link from "next/link";
-import { ProductCard } from "./components/ProductCard";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <main><h1>Hello World</h1>
-    <Link href="/users">Users</Link>
-    <ProductCard />
+    <main className="min-h-screen flex items-center justify-center gap-4">
+      <Link href="/sign-in" className="btn">
+        Sign in
+      </Link>
+      <Link href="/sign-up" className="btn">
+        Sign up
+      </Link>
     </main>
   );
 }
