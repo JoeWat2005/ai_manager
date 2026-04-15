@@ -1,5 +1,5 @@
 // app/[slug]/dashboard/page.tsx
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import { PricingTable } from "@clerk/nextjs";
 
@@ -8,19 +8,14 @@ export default async function DashboardPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { userId, orgId, has } = await auth();
+  const { userId, orgId, orgSlug, has } = await auth();
   const { slug } = await params;
 
   if (!userId || !orgId) {
     redirect("/sign-in");
   }
 
-  const client = await clerkClient();
-  const org = await client.organizations.getOrganization({
-    organizationId: orgId,
-  });
-
-  if (org.slug !== slug) {
+  if (!orgSlug || orgSlug !== slug) {
     notFound();
   }
 

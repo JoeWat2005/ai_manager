@@ -1,22 +1,13 @@
 // app/page.tsx
 import Link from "next/link";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
-  const { userId, orgId } = await auth();
+  const { userId } = await auth();
 
   if (userId) {
-    if (!orgId) {
-      redirect("/onboarding");
-    }
-
-    const client = await clerkClient();
-    const org = await client.organizations.getOrganization({
-      organizationId: orgId,
-    });
-
-    redirect(`/${org.slug}/dashboard`);
+    redirect("/post-auth");
   }
 
   return (
