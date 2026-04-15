@@ -14,10 +14,5 @@ export function toDate(value: number | string | null | undefined): Date | null {
 export function getSubscriptionOrgId(
   sub: ClerkSubscriptionEventData
 ): string | null {
-  return (
-    sub.organization_id ??
-    sub.organization?.id ??
-    sub.payer?.organization_id ??
-    null
-  );
+  return sub.payer?.organization_id ?? null;
 }

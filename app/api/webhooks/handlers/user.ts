@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  listUserOrganizationIds,
+  syncOrganizationMemberships,
+} from "@/lib/clerk/membership-sync";
 import { badRequest, ok } from "../clerk/responses";
 import { ClerkDeletedEventData, ClerkUserEventData } from "../clerk/types";
 
@@ -30,10 +34,37 @@ export async function handleUserUpsert(
     },
   });
 
+  const membershipSync: unknown[] = [];
+  const membershipSyncErrors: unknown[] = [];
+
+  try {
+    const clerkOrgIds = await listUserOrganizationIds(user.id);
+
+    for (const clerkOrgId of clerkOrgIds) {
+      try {
+        const summary = await syncOrganizationMemberships(clerkOrgId);
+        membershipSync.push(summary);
+      } catch (error) {
+        membershipSyncErrors.push({
+          clerkOrgId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  } catch (error) {
+    membershipSyncErrors.push({
+      scope: "listUserOrganizationIds",
+      clerkUserId: user.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return ok(eventType, "User synced", {
     clerkUserId: user.id,
     userId: savedUser.id,
     email: savedUser.email,
+    membershipSync,
+    membershipSyncErrors,
   });
 }
 

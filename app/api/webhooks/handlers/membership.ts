@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { syncOrganizationMemberships } from "@/lib/clerk/membership-sync";
 import { badRequest, ok } from "../clerk/responses";
 import { ClerkOrganizationMembershipEventData } from "../clerk/types";
 
@@ -24,17 +25,29 @@ export async function handleMembershipUpsert(
   });
 
   if (!user || !organization) {
+    let reconciliation: unknown = null;
+    if (organization) {
+      try {
+        reconciliation = await syncOrganizationMemberships(clerkOrgId);
+      } catch (error) {
+        reconciliation = {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
     return ok(
-        eventType,
-        "Membership skipped because dependent records are not synced yet",
-        {
+      eventType,
+      "Membership skipped because dependent records are not synced yet",
+      {
         clerkUserId,
         clerkOrgId,
         foundUser: !!user,
         foundOrganization: !!organization,
-        }
+        reconciliation,
+      }
     );
-    }
+  }
 
   const savedMembership = await prisma.organizationMembership.upsert({
     where: {

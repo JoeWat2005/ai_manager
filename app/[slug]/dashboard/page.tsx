@@ -1,22 +1,46 @@
 import { PricingTable } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { getEffectivePlan, isPaidPlan } from "@/lib/billing/effective-plan";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { has } = await auth();
+  const { orgId } = await auth();
   const { slug } = await params;
 
-  const hasFull = has({ feature: "full" });
-  const hasLimited = has({ feature: "limited" });
+  const timelineItems = orgId
+    ? await prisma.subscriptionItem.findMany({
+        where: {
+          subscription: {
+            organization: {
+              clerkOrgId: orgId,
+            },
+          },
+        },
+        select: {
+          plan: true,
+          status: true,
+          periodEnd: true,
+        },
+        orderBy: [{ periodStart: "asc" }, { id: "asc" }],
+      })
+    : [];
+
+  const effectivePlan = getEffectivePlan(timelineItems);
+  const hasPaidPlan = isPaidPlan(effectivePlan);
 
   return (
     <main className="space-y-6 p-6">
       <h1 className="text-2xl font-semibold">Dashboard for {slug}</h1>
 
-      {!hasFull && hasLimited && (
+      <section className="rounded-xl border p-4">
+        <p className="text-sm opacity-80">Current effective plan: {effectivePlan}</p>
+      </section>
+
+      {!hasPaidPlan && (
         <section className="space-y-4 rounded-xl border p-6">
           <div>
             <h2 className="text-xl font-semibold">Upgrade to Pro</h2>
@@ -32,7 +56,7 @@ export default async function DashboardPage({
         </section>
       )}
 
-      {hasFull ? (
+      {hasPaidPlan ? (
         <section className="rounded-xl border p-6">
           <p>Pro dashboard content goes here.</p>
         </section>

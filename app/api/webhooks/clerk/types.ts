@@ -52,6 +52,7 @@ export type ClerkSubscriptionEventData = {
   } | null;
 
   items?: Array<{
+    id?: string | null;
     status?: string | null;
     plan_id?: string | null;
     period_start?: number | string | null;

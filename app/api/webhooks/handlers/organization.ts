@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { syncOrganizationMemberships } from "@/lib/clerk/membership-sync";
 import { badRequest, ok } from "../clerk/responses";
 import { ClerkDeletedEventData, ClerkOrganizationEventData } from "../clerk/types";
 
@@ -19,10 +20,20 @@ export async function handleOrganizationUpsert(
     },
   });
 
+  let membershipSync: unknown = null;
+  try {
+    membershipSync = await syncOrganizationMemberships(org.id);
+  } catch (error) {
+    membershipSync = {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   return ok(eventType, "Organization synced", {
     clerkOrgId: org.id,
     organizationId: savedOrg.id,
     slug: savedOrg.slug,
+    membershipSync,
   });
 }
 

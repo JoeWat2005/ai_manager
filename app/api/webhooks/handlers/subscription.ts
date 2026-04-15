@@ -1,3 +1,4 @@
+import { getEffectivePlan } from "@/lib/billing/effective-plan";
 import { prisma } from "@/lib/prisma";
 import { badRequest, ok } from "../clerk/responses";
 import { ClerkSubscriptionEventData } from "../clerk/types";
@@ -10,7 +11,7 @@ export async function handleSubscriptionUpsert(
   const clerkOrgId = getSubscriptionOrgId(sub);
 
   if (!clerkOrgId) {
-    return badRequest(eventType, "Subscription missing organization id", {
+    return badRequest(eventType, "Subscription missing payer organization id", {
       subscription: sub,
     });
   }
@@ -24,55 +25,103 @@ export async function handleSubscriptionUpsert(
       eventType,
       "Subscription skipped because organization is not synced yet",
       {
-      clerkOrgId,
-      subscriptionId: sub.id,
+        clerkOrgId,
+        clerkSubscriptionId: sub.id,
       }
     );
   }
 
-  const activeItem =
-    sub.items?.find((item) => item.status === "active") ??
-    sub.items?.[0] ??
-    null;
+  const incomingItems = sub.items ?? [];
+  for (const item of incomingItems) {
+    if (!item.id) {
+      return badRequest(eventType, "Subscription item missing id", {
+        clerkOrgId,
+        clerkSubscriptionId: sub.id,
+        item,
+      });
+    }
+  }
 
-  const plan =
-    activeItem?.plan?.slug ??
-    activeItem?.plan?.name ??
-    sub.plan_name ??
-    "free";
+  const normalizedItems = incomingItems.map((item) => ({
+    clerkSubscriptionItemId: item.id as string,
+    plan: item.plan?.slug ?? item.plan?.name ?? "free",
+    status: item.status ?? "unknown",
+    periodStart: toDate(item.period_start),
+    periodEnd: toDate(item.period_end),
+  }));
 
-  const currentPeriodEnd =
-    toDate(activeItem?.period_end) ?? toDate(sub.current_period_end);
+  const result = await prisma.$transaction(async (tx) => {
+    const savedSubscription = await tx.subscription.upsert({
+      where: { clerkSubscriptionId: sub.id },
+      update: {
+        organizationId: organization.id,
+        status: sub.status ?? "inactive",
+      },
+      create: {
+        organizationId: organization.id,
+        clerkSubscriptionId: sub.id,
+        status: sub.status ?? "inactive",
+      },
+    });
 
-  const savedSubscription = await prisma.subscription.upsert({
-    where: {
-      organizationId: organization.id,
-    },
-    update: {
-      plan,
-      status: sub.status ?? "inactive",
-      billingSubscriptionId: sub.id ?? null,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
-    },
-    create: {
-      organizationId: organization.id,
-      plan,
-      status: sub.status ?? "inactive",
-      billingSubscriptionId: sub.id ?? null,
-      currentPeriodEnd,
-      cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
-    },
+    for (const item of normalizedItems) {
+      await tx.subscriptionItem.upsert({
+        where: { clerkSubscriptionItemId: item.clerkSubscriptionItemId },
+        update: {
+          subscriptionId: savedSubscription.id,
+          plan: item.plan,
+          status: item.status,
+          periodStart: item.periodStart,
+          periodEnd: item.periodEnd,
+        },
+        create: {
+          subscriptionId: savedSubscription.id,
+          clerkSubscriptionItemId: item.clerkSubscriptionItemId,
+          plan: item.plan,
+          status: item.status,
+          periodStart: item.periodStart,
+          periodEnd: item.periodEnd,
+        },
+      });
+    }
+
+    if (normalizedItems.length === 0) {
+      await tx.subscriptionItem.deleteMany({
+        where: { subscriptionId: savedSubscription.id },
+      });
+    } else {
+      await tx.subscriptionItem.deleteMany({
+        where: {
+          subscriptionId: savedSubscription.id,
+          clerkSubscriptionItemId: {
+            notIn: normalizedItems.map((item) => item.clerkSubscriptionItemId),
+          },
+        },
+      });
+    }
+
+    const savedItems = await tx.subscriptionItem.findMany({
+      where: { subscriptionId: savedSubscription.id },
+      orderBy: [{ periodStart: "asc" }, { id: "asc" }],
+    });
+
+    return { savedSubscription, savedItems };
   });
 
-  return ok(eventType, "Subscription synced", {
-    subscriptionId: savedSubscription.id,
-    clerkSubscriptionId: sub.id,
+  const effectivePlan = getEffectivePlan(
+    result.savedItems.map((item) => ({
+      plan: item.plan,
+      status: item.status,
+      periodEnd: item.periodEnd,
+    }))
+  );
+
+  return ok(eventType, "Subscription timeline synced", {
+    subscriptionId: result.savedSubscription.id,
+    clerkSubscriptionId: result.savedSubscription.clerkSubscriptionId,
     clerkOrgId,
-    status: savedSubscription.status,
-    plan: savedSubscription.plan,
-    billingSubscriptionId: savedSubscription.billingSubscriptionId,
-    currentPeriodEnd: savedSubscription.currentPeriodEnd,
-    cancelAtPeriodEnd: savedSubscription.cancelAtPeriodEnd,
+    status: result.savedSubscription.status,
+    itemCount: result.savedItems.length,
+    effectivePlan,
   });
 }
