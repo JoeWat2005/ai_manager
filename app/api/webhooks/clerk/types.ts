@@ -1,3 +1,4 @@
+// app/api/webhooks/clerk/types.ts
 export type ClerkEmailAddress = {
   id: string;
   email_address: string;
@@ -40,10 +41,26 @@ export type ClerkSubscriptionEventData = {
   current_period_start?: number | string | null;
   current_period_end?: number | string | null;
   cancel_at_period_end?: boolean | null;
+
   organization_id?: string | null;
   organization?: {
     id?: string | null;
   } | null;
+
+  payer?: {
+    organization_id?: string | null;
+  } | null;
+
+  items?: Array<{
+    status?: string | null;
+    plan_id?: string | null;
+    period_start?: number | string | null;
+    period_end?: number | string | null;
+    plan?: {
+      name?: string | null;
+      slug?: string | null;
+    } | null;
+  }> | null;
 };
 
 export type ClerkDeletedEventData = {

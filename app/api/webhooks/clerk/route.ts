@@ -1,5 +1,6 @@
-import { internalError } from "../responses";
-import { verifyClerkWebhook } from "../verify";
+// app/api/webhooks/clerk/routes.ts
+import { internalError } from "./responses";
+import { verifyClerkWebhook } from "./verify";
 import { handleClerkEvent } from "../handlers";
 
 export async function POST(req: Request) {

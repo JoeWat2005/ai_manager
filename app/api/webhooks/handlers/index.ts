@@ -6,8 +6,8 @@ import {
   ClerkSubscriptionEventData,
   ClerkUserEventData,
   VerifiedClerkEvent,
-} from "../types";
-import { ok } from "../responses";
+} from "../clerk/types";
+import { ok } from "../clerk/responses";
 import { handleUserDeleted, handleUserUpsert } from "./user";
 import {
   handleOrganizationDeleted,
@@ -16,9 +16,9 @@ import {
 import {
   handleMembershipDeleted,
   handleMembershipUpsert,
-} from "./membership";
-import { handleSubscriptionUpsert } from "./subscription";
-import { handlePaymentAttempt } from "./payment";
+} from "../handlers/membership";
+import { handleSubscriptionUpsert } from "../handlers/subscription";
+import { handlePaymentAttempt } from "../handlers/payment";
 
 export async function handleClerkEvent(
   evt: VerifiedClerkEvent

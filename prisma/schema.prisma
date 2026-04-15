@@ -13,66 +13,41 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(cuid())
-  clerkUserId       String   @unique
-  email             String   @unique
-  firstName         String?
-  lastName          String?
-  imageUrl          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  createdOrganizations Organization[]          @relation("OrganizationCreator")
-  memberships          OrganizationMembership[]
+  id          String                   @id @default(cuid())
+  clerkUserId String                   @unique
+  email       String                   @unique
+  memberships OrganizationMembership[]
 }
 
 model Organization {
-  id                String   @id @default(cuid())
-  clerkOrgId        String   @unique
-  name              String
-  slug              String   @unique
-  imageUrl          String?
-  createdByUserId   String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  createdBy         User?    @relation("OrganizationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  memberships       OrganizationMembership[]
-  subscription      Subscription?
+  id           String                   @id @default(cuid())
+  clerkOrgId   String                   @unique
+  name         String
+  slug         String                   @unique
+  memberships  OrganizationMembership[]
+  subscription Subscription?
 }
 
 model OrganizationMembership {
-  id               String       @id @default(cuid())
-  userId           String
-  organizationId   String
-  role             String       @default("member")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           String       @default("member")
 
-  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
 }
 
 model Subscription {
-  id                      String   @id @default(cuid())
-  organizationId          String   @unique
+  id                    String       @id @default(cuid())
+  organizationId        String       @unique
+  plan                  String       @default("free")
+  status                String       @default("inactive")
+  billingSubscriptionId String?      @unique
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean      @default(false)
 
-  plan                    String   @default("free")
-  status                  String   @default("inactive")
-
-  billingProvider         String?
-  billingCustomerId       String?  @unique
-  billingSubscriptionId   String?  @unique
-  priceId                 String?
-
-  currentPeriodStart      DateTime?
-  currentPeriodEnd        DateTime?
-  cancelAtPeriodEnd       Boolean  @default(false)
-
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }

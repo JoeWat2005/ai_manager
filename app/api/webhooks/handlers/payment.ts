@@ -1,5 +1,5 @@
-import { ok } from "../responses";
-import { ClerkPaymentAttemptEventData } from "../types";
+import { ok } from "../clerk/responses";
+import { ClerkPaymentAttemptEventData } from "../clerk/types";
 
 export async function handlePaymentAttempt(
   eventType: string,

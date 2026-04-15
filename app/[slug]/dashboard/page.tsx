@@ -1,37 +1,27 @@
-// app/[slug]/dashboard/page.tsx
-import { auth } from "@clerk/nextjs/server";
-import { notFound, redirect } from "next/navigation";
 import { PricingTable } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 
 export default async function DashboardPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { userId, orgId, orgSlug, has } = await auth();
+  const { has } = await auth();
   const { slug } = await params;
-
-  if (!userId || !orgId) {
-    redirect("/sign-in");
-  }
-
-  if (!orgSlug || orgSlug !== slug) {
-    notFound();
-  }
 
   const hasFull = has({ feature: "full" });
   const hasLimited = has({ feature: "limited" });
 
   return (
-    <main className="p-6 space-y-6">
+    <main className="space-y-6 p-6">
       <h1 className="text-2xl font-semibold">Dashboard for {slug}</h1>
 
       {!hasFull && hasLimited && (
-        <section className="rounded-xl border p-6 space-y-4">
+        <section className="space-y-4 rounded-xl border p-6">
           <div>
             <h2 className="text-xl font-semibold">Upgrade to Pro</h2>
             <p className="text-sm opacity-80">
-              You’re on the free plan. Upgrade to unlock full access.
+              You are on the free plan. Upgrade to unlock full access.
             </p>
           </div>
 

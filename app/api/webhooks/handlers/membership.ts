@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { badRequest, ok } from "../responses";
-import { ClerkOrganizationMembershipEventData } from "../types";
+import { badRequest, ok } from "../clerk/responses";
+import { ClerkOrganizationMembershipEventData } from "../clerk/types";
 
 export async function handleMembershipUpsert(
   eventType: string,
@@ -24,13 +24,17 @@ export async function handleMembershipUpsert(
   });
 
   if (!user || !organization) {
-    return badRequest(eventType, "User or organization not found for membership", {
-      clerkUserId,
-      clerkOrgId,
-      foundUser: !!user,
-      foundOrganization: !!organization,
-    });
-  }
+    return ok(
+        eventType,
+        "Membership skipped because dependent records are not synced yet",
+        {
+        clerkUserId,
+        clerkOrgId,
+        foundUser: !!user,
+        foundOrganization: !!organization,
+        }
+    );
+    }
 
   const savedMembership = await prisma.organizationMembership.upsert({
     where: {

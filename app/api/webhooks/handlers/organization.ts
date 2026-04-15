@@ -1,35 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { badRequest, ok } from "../responses";
-import { ClerkDeletedEventData, ClerkOrganizationEventData } from "../types";
+import { badRequest, ok } from "../clerk/responses";
+import { ClerkDeletedEventData, ClerkOrganizationEventData } from "../clerk/types";
 
 export async function handleOrganizationUpsert(
   eventType: string,
   org: ClerkOrganizationEventData
 ): Promise<Response> {
-  let createdByUserId: string | null = null;
-
-  if (org.created_by) {
-    const creator = await prisma.user.findUnique({
-      where: { clerkUserId: org.created_by },
-    });
-
-    createdByUserId = creator?.id ?? null;
-  }
-
   const savedOrg = await prisma.organization.upsert({
     where: { clerkOrgId: org.id },
     update: {
       name: org.name,
       slug: org.slug,
-      imageUrl: org.image_url ?? null,
-      createdByUserId,
     },
     create: {
       clerkOrgId: org.id,
       name: org.name,
       slug: org.slug,
-      imageUrl: org.image_url ?? null,
-      createdByUserId,
     },
   });
 
@@ -37,7 +23,6 @@ export async function handleOrganizationUpsert(
     clerkOrgId: org.id,
     organizationId: savedOrg.id,
     slug: savedOrg.slug,
-    createdByUserId,
   });
 }
 

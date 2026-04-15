@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { badRequest, ok } from "../responses";
-import { ClerkDeletedEventData, ClerkUserEventData } from "../types";
+import { badRequest, ok } from "../clerk/responses";
+import { ClerkDeletedEventData, ClerkUserEventData } from "../clerk/types";
 
 export async function handleUserUpsert(
   eventType: string,
@@ -23,16 +23,10 @@ export async function handleUserUpsert(
     where: { clerkUserId: user.id },
     update: {
       email: primaryEmail,
-      firstName: user.first_name ?? null,
-      lastName: user.last_name ?? null,
-      imageUrl: user.image_url ?? null,
     },
     create: {
       clerkUserId: user.id,
       email: primaryEmail,
-      firstName: user.first_name ?? null,
-      lastName: user.last_name ?? null,
-      imageUrl: user.image_url ?? null,
     },
   });
 
