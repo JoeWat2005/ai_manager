@@ -1,9 +1,12 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,14 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 
@@ -112,6 +107,142 @@ export function BookingsWorkspace({
         .sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt))
         .slice(0, 12),
     [bookings]
+  );
+
+  const staffColumns = useMemo<ColumnDef<StaffProfile>[]>(
+    () => [
+      {
+        accessorKey: "displayName",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Staff" />
+        ),
+        cell: ({ row }) => (
+          <div>
+            <p className="font-semibold">{row.original.displayName}</p>
+            <p className="text-xs text-muted-foreground">
+              {row.original.email ?? "No email"}
+            </p>
+          </div>
+        ),
+      },
+      {
+        accessorFn: (profile) => (profile.bookable ? 1 : 0),
+        id: "bookable",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Bookable" />
+        ),
+        cell: ({ row }) => (
+          <Switch
+            checked={row.original.bookable}
+            onCheckedChange={(checked) =>
+              updateStaffProfile(row.original.id, { bookable: checked })
+            }
+          />
+        ),
+      },
+      {
+        accessorKey: "priority",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Priority" />
+        ),
+        cell: ({ row }) => (
+          <Input
+            type="number"
+            className="w-20"
+            value={row.original.priority}
+            onChange={(event) =>
+              updateStaffProfile(row.original.id, {
+                priority: Number(event.target.value),
+              })
+            }
+          />
+        ),
+      },
+      {
+        accessorKey: "timezone",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Timezone" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.timezone}</span>
+        ),
+      },
+    ],
+    []
+  );
+
+  const bookingColumns = useMemo<ColumnDef<BookingRow>[]>(
+    () => [
+      {
+        accessorFn: (booking) => booking.contact.name ?? "Unknown contact",
+        id: "customer",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Customer" />
+        ),
+        cell: ({ row }) => (
+          <div>
+            <p className="font-semibold">
+              {row.original.contact.name ?? "Unknown contact"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {row.original.contact.phone ?? row.original.contact.email ?? "No contact"}
+            </p>
+          </div>
+        ),
+      },
+      {
+        accessorFn: (booking) => booking.service ?? "General",
+        id: "service",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Service" />
+        ),
+        cell: ({ row }) => row.original.service ?? "General",
+      },
+      {
+        accessorFn: (booking) => booking.staffProfile?.displayName ?? "Unassigned",
+        id: "assignedStaff",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Assigned staff" />
+        ),
+        cell: ({ row }) => row.original.staffProfile?.displayName ?? "Unassigned",
+      },
+      {
+        accessorFn: (booking) => new Date(booking.startAt).getTime(),
+        id: "startAt",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Start" />
+        ),
+        cell: ({ row }) => new Date(row.original.startAt).toLocaleString(),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Status" />
+        ),
+        cell: ({ row }) => (
+          <Select
+            value={row.original.status}
+            onValueChange={(value) =>
+              updateBookingStatus(row.original.id, value as BookingStatus)
+            }
+          >
+            <SelectTrigger size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {STATUS_OPTIONS.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        ),
+      },
+    ],
+    []
   );
 
   async function createBooking(event: React.FormEvent) {
@@ -460,51 +591,12 @@ export function BookingsWorkspace({
           <CardTitle>Bookable staff profiles</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Staff</TableHead>
-                <TableHead>Bookable</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Timezone</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {staffProfiles.map((profile) => (
-                <TableRow key={profile.id}>
-                  <TableCell>
-                    <p className="font-semibold">{profile.displayName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {profile.email ?? "No email"}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={profile.bookable}
-                      onCheckedChange={(checked) =>
-                        updateStaffProfile(profile.id, { bookable: checked })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      className="w-20"
-                      value={profile.priority}
-                      onChange={(e) =>
-                        updateStaffProfile(profile.id, {
-                          priority: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {profile.timezone}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={staffColumns}
+            data={staffProfiles}
+            emptyMessage="No staff profiles available yet."
+            initialSorting={[{ id: "priority", desc: false }]}
+          />
         </CardContent>
       </Card>
 
@@ -514,65 +606,12 @@ export function BookingsWorkspace({
           <CardTitle>Upcoming bookings</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Assigned staff</TableHead>
-                <TableHead>Start</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {nextBookings.map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell>
-                    <p className="font-semibold">{booking.contact.name ?? "Unknown contact"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {booking.contact.phone ?? booking.contact.email ?? "No contact"}
-                    </p>
-                  </TableCell>
-                  <TableCell>{booking.service ?? "General"}</TableCell>
-                  <TableCell>
-                    {booking.staffProfile?.displayName ?? "Unassigned"}
-                  </TableCell>
-                  <TableCell>{new Date(booking.startAt).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={booking.status}
-                      onValueChange={(value) =>
-                        updateBookingStatus(booking.id, value as BookingStatus)
-                      }
-                    >
-                      <SelectTrigger size="sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {STATUS_LABELS[status]}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {nextBookings.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="py-6 text-center text-sm text-muted-foreground"
-                  >
-                    No bookings yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={bookingColumns}
+            data={nextBookings}
+            emptyMessage="No bookings yet."
+            initialSorting={[{ id: "startAt", desc: false }]}
+          />
         </CardContent>
       </Card>
     </div>

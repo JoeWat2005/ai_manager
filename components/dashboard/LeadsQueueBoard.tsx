@@ -1,5 +1,6 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,14 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 
 type LeadStatus = "new" | "contacted" | "closed";
 
@@ -82,6 +77,108 @@ export function LeadsQueueBoard({ initialLeads }: Props) {
 
     return { total, newCount, contactedCount, qualifiedCount };
   }, [leads]);
+
+  const columns = useMemo<ColumnDef<Lead>[]>(
+    () => [
+      {
+        accessorFn: (lead) => lead.contact?.name ?? "Unknown caller",
+        id: "lead",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Lead" />
+        ),
+        cell: ({ row }) => {
+          const lead = row.original;
+
+          return (
+            <div className="flex min-w-44 flex-col gap-1">
+              <p className="font-semibold">{lead.contact?.name ?? "Unknown caller"}</p>
+              <p className="text-xs text-muted-foreground">
+                {lead.contact?.phone ?? lead.contact?.email ?? "Missing contact"}
+              </p>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "channel",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Channel" />
+        ),
+        cell: ({ row }) => (
+          <Badge
+            variant={row.original.channel === "phone" ? "outline" : "secondary"}
+          >
+            {row.original.channel}
+          </Badge>
+        ),
+      },
+      {
+        accessorFn: (lead) => lead.intent ?? "No intent captured",
+        id: "intent",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Intent" />
+        ),
+        cell: ({ row }) => (
+          <div className="max-w-sm whitespace-normal text-sm text-muted-foreground">
+            {row.original.intent ?? "No intent captured"}
+          </div>
+        ),
+      },
+      {
+        accessorFn: (lead) => lead.preferredCallbackWindow ?? "No preference",
+        id: "callback",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Callback" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.preferredCallbackWindow ?? "No preference"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Status" />
+        ),
+        cell: ({ row }) => {
+          const lead = row.original;
+
+          return (
+            <Select
+              value={lead.status}
+              disabled={savingLeadId === lead.id}
+              onValueChange={(value) => updateLeadStatus(lead.id, value as LeadStatus)}
+            >
+              <SelectTrigger size="sm" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          );
+        },
+      },
+      {
+        accessorFn: (lead) => new Date(lead.createdAt).getTime(),
+        id: "createdAt",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Created" />
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleString()}
+          </span>
+        ),
+      },
+    ],
+    [savingLeadId]
+  );
 
   async function updateLeadStatus(leadId: string, status: LeadStatus) {
     setSavingLeadId(leadId);
@@ -179,76 +276,12 @@ export function LeadsQueueBoard({ initialLeads }: Props) {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Lead</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Intent</TableHead>
-                <TableHead>Callback</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLeads.map((lead) => (
-                <TableRow key={lead.id}>
-                  <TableCell className="align-top">
-                    <div className="flex min-w-44 flex-col gap-1">
-                      <p className="font-semibold">
-                        {lead.contact?.name ?? "Unknown caller"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {lead.contact?.phone ?? lead.contact?.email ?? "Missing contact"}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <Badge variant={lead.channel === "phone" ? "outline" : "secondary"}>
-                      {lead.channel}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-sm align-top whitespace-normal text-sm text-muted-foreground">
-                    {lead.intent ?? "No intent captured"}
-                  </TableCell>
-                  <TableCell className="align-top text-sm text-muted-foreground">
-                    {lead.preferredCallbackWindow ?? "No preference"}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <Select
-                      value={lead.status}
-                      disabled={savingLeadId === lead.id}
-                      onValueChange={(value) =>
-                        updateLeadStatus(lead.id, value as LeadStatus)
-                      }
-                    >
-                      <SelectTrigger size="sm" className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="align-top text-sm text-muted-foreground">
-                    {new Date(lead.createdAt).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {filteredLeads.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                    No leads match your filters yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={columns}
+            data={filteredLeads}
+            emptyMessage="No leads match your filters yet."
+            initialSorting={[{ id: "createdAt", desc: true }]}
+          />
 
           {error && <p className="mt-4 text-sm font-medium text-destructive">{error}</p>}
         </CardContent>

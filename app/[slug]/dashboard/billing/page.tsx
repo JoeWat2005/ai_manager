@@ -1,4 +1,5 @@
 import { PricingTable } from "@clerk/nextjs";
+import { BillingTimelineTable } from "@/components/dashboard/BillingTimelineTable";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,14 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { isPaidPlan } from "@/lib/billing/effective-plan";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 import { prisma } from "@/lib/prisma";
@@ -44,6 +37,14 @@ export default async function BillingPage({
     orderBy: [{ periodStart: "desc" }, { id: "desc" }],
   });
 
+  const billingRows = timelineItems.map((item) => ({
+    id: item.id,
+    plan: item.plan,
+    status: item.status,
+    periodStart: item.periodStart ? item.periodStart.toISOString() : null,
+    periodEnd: item.periodEnd ? item.periodEnd.toISOString() : null,
+  }));
+
   // effectivePlan already computed inside getOrganizationByClerkOrgId — no re-derive needed.
   const { effectivePlan } = organization;
 
@@ -65,39 +66,7 @@ export default async function BillingPage({
             <Badge variant={isPaidPlan(effectivePlan) ? "default" : "outline"}>
               {effectivePlan}
             </Badge>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Period</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {timelineItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.plan}</TableCell>
-                      <TableCell className="capitalize">{item.status}</TableCell>
-                      <TableCell>
-                        {item.periodStart ? item.periodStart.toLocaleDateString() : "-"} -{" "}
-                        {item.periodEnd ? item.periodEnd.toLocaleDateString() : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {timelineItems.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={3}
-                        className="text-center text-sm text-muted-foreground"
-                      >
-                        No subscription events synced yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <BillingTimelineTable items={billingRows} />
           </CardContent>
         </Card>
 

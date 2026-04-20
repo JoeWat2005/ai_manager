@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OrganizationSnapshotTable } from "@/components/dashboard/OrganizationSnapshotTable";
 import { getEffectivePlan, isPaidPlan } from "@/lib/billing/effective-plan";
 import { prisma } from "@/lib/prisma";
 
@@ -57,6 +58,19 @@ export default async function StatsPage() {
   const freeOrgCount = Math.max(orgCount - proOrgCount, 0);
   const averageMembershipsPerOrg =
     orgCount > 0 ? (membershipCount / orgCount).toFixed(1) : "0.0";
+  const organizationRows = organizations.map((organization) => {
+    const effectivePlan = getEffectivePlan(organization.subscription?.items ?? []);
+    const paid = isPaidPlan(effectivePlan);
+
+    return {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      members: organization._count.memberships,
+      effectivePlan,
+      paid,
+    };
+  });
 
   return (
     <div data-theme="light" className="min-h-screen bg-base-200/50">
@@ -133,43 +147,7 @@ export default async function StatsPage() {
               First 12 organizations, including current effective plan and member counts.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="table table-zebra">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Slug</th>
-                  <th>Members</th>
-                  <th>Effective Plan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {organizations.map((organization) => {
-                  const effectivePlan = getEffectivePlan(
-                    organization.subscription?.items ?? []
-                  );
-                  const paid = isPaidPlan(effectivePlan);
-
-                  return (
-                    <tr key={organization.id}>
-                      <td>{organization.name}</td>
-                      <td className="font-mono text-sm">{organization.slug}</td>
-                      <td>{organization._count.memberships}</td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            paid ? "badge-primary" : "badge-neutral"
-                          }`.trim()}
-                        >
-                          {effectivePlan}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <OrganizationSnapshotTable organizations={organizationRows} />
         </section>
       </main>
     </div>

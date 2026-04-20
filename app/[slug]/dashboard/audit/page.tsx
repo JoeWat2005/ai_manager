@@ -1,14 +1,6 @@
+import { AuditLogTable } from "@/components/dashboard/AuditLogTable";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 import { prisma } from "@/lib/prisma";
 
@@ -30,6 +22,16 @@ export default async function AuditPage({
     take: 250,
   });
 
+  const rows = logs.map((log) => ({
+    id: log.id,
+    createdAt: log.createdAt.toISOString(),
+    action: log.action,
+    description: log.description,
+    targetType: log.targetType,
+    targetId: log.targetId,
+    actorUserId: log.actorUserId,
+  }));
+
   return (
     <main className="space-y-6">
       <DashboardPageHeader
@@ -40,40 +42,7 @@ export default async function AuditPage({
 
       <Card>
         <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Actor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{log.createdAt.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{log.action}</Badge>
-                  </TableCell>
-                  <TableCell>{log.description}</TableCell>
-                  <TableCell>
-                    {log.targetType ?? "-"}
-                    {log.targetId ? ` (${log.targetId.slice(0, 8)}...)` : ""}
-                  </TableCell>
-                  <TableCell>{log.actorUserId ?? "system"}</TableCell>
-                </TableRow>
-              ))}
-              {logs.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                    No audit events yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <AuditLogTable logs={rows} />
         </CardContent>
       </Card>
     </main>

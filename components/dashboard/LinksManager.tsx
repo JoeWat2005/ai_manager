@@ -1,5 +1,6 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { AccentColorSelector } from "@/components/dashboard/AccentColorSelector";
 import { Badge } from "@/components/ui/badge";
@@ -22,14 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import { Textarea } from "@/components/ui/textarea";
 
 type LinkItem = {
@@ -87,6 +82,107 @@ export function LinksManager({ initialProfile }: Props) {
     url: "",
     platform: "custom" as LinkItem["platform"],
   });
+
+  const columns: ColumnDef<LinkItem>[] = [
+    {
+      accessorKey: "label",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Label" />
+      ),
+      cell: ({ row }) => (
+        <Input
+          value={row.original.label}
+          onChange={(event) =>
+            setProfile((current) => ({
+              ...current,
+              items: current.items.map((candidate) =>
+                candidate.id === row.original.id
+                  ? { ...candidate, label: event.target.value }
+                  : candidate
+              ),
+            }))
+          }
+          onBlur={() => patchItem(row.original.id, { label: row.original.label })}
+        />
+      ),
+    },
+    {
+      accessorKey: "url",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="URL" />
+      ),
+      cell: ({ row }) => (
+        <div className="min-w-64">
+          <Input
+            value={row.original.url}
+            onChange={(event) =>
+              setProfile((current) => ({
+                ...current,
+                items: current.items.map((candidate) =>
+                  candidate.id === row.original.id
+                    ? { ...candidate, url: event.target.value }
+                    : candidate
+                ),
+              }))
+            }
+            onBlur={() => patchItem(row.original.id, { url: row.original.url })}
+          />
+        </div>
+      ),
+    },
+    {
+      accessorKey: "platform",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Platform" />
+      ),
+      cell: ({ row }) => <Badge variant="outline">{row.original.platform}</Badge>,
+    },
+    {
+      accessorFn: (item) => (item.visible ? 1 : 0),
+      id: "visible",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Visible" />
+      ),
+      cell: ({ row }) => (
+        <Switch
+          checked={row.original.visible}
+          onCheckedChange={(checked) => patchItem(row.original.id, { visible: checked })}
+        />
+      ),
+    },
+    {
+      accessorKey: "sortOrder",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Order" />
+      ),
+      cell: ({ row }) => (
+        <Input
+          type="number"
+          className="w-20"
+          value={row.original.sortOrder}
+          onChange={(event) =>
+            patchItem(row.original.id, { sortOrder: Number(event.target.value) })
+          }
+        />
+      ),
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      header: "Actions",
+      cell: ({ row }) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          onClick={() => deleteItem(row.original.id)}
+        >
+          Delete
+        </Button>
+      ),
+    },
+  ];
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -404,93 +500,12 @@ export function LinksManager({ initialProfile }: Props) {
           <CardDescription>Adjust labels, order, visibility, and destinations inline.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Label</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>Platform</TableHead>
-                <TableHead>Visible</TableHead>
-                <TableHead>Order</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {profile.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <Input
-                      value={item.label}
-                      onChange={(event) =>
-                        setProfile((current) => ({
-                          ...current,
-                          items: current.items.map((candidate) =>
-                            candidate.id === item.id
-                              ? { ...candidate, label: event.target.value }
-                              : candidate
-                          ),
-                        }))
-                      }
-                      onBlur={() => patchItem(item.id, { label: item.label })}
-                    />
-                  </TableCell>
-                  <TableCell className="min-w-64">
-                    <Input
-                      value={item.url}
-                      onChange={(event) =>
-                        setProfile((current) => ({
-                          ...current,
-                          items: current.items.map((candidate) =>
-                            candidate.id === item.id
-                              ? { ...candidate, url: event.target.value }
-                              : candidate
-                          ),
-                        }))
-                      }
-                      onBlur={() => patchItem(item.id, { url: item.url })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{item.platform}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={item.visible}
-                      onCheckedChange={(checked) => patchItem(item.id, { visible: checked })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      className="w-20"
-                      value={item.sortOrder}
-                      onChange={(event) =>
-                        patchItem(item.id, { sortOrder: Number(event.target.value) })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => deleteItem(item.id)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {profile.items.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                    No links added yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={columns}
+            data={profile.items}
+            emptyMessage="No links added yet."
+            initialSorting={[{ id: "sortOrder", desc: false }]}
+          />
 
           {(message || error) && (
             <p className={`mt-4 text-sm font-medium ${error ? "text-destructive" : "text-primary"}`}>

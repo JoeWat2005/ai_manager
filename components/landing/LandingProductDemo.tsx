@@ -1,6 +1,10 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 
 type DemoTabId = "chat" | "bookings" | "calls";
 
@@ -92,28 +96,28 @@ const bookingRows = [
     service: "Consultation",
     slot: "Today, 2:30 PM",
     status: "Confirmed",
-    badge: "badge-success",
+    badgeVariant: "default" as const,
   },
   {
     customer: "Noah Walters",
     service: "Follow-up",
     slot: "Today, 4:15 PM",
     status: "Reminder sent",
-    badge: "badge-info",
+    badgeVariant: "secondary" as const,
   },
   {
     customer: "Priya Nair",
     service: "New client intake",
     slot: "Tomorrow, 10:00 AM",
     status: "Needs approval",
-    badge: "badge-warning",
+    badgeVariant: "outline" as const,
   },
   {
     customer: "Mason Price",
     service: "Rescheduled",
     slot: "Tomorrow, 1:45 PM",
     status: "Updated",
-    badge: "badge-neutral",
+    badgeVariant: "secondary" as const,
   },
 ];
 
@@ -151,6 +155,34 @@ function panelClass(isActive: boolean): string {
       : "pointer-events-none translate-y-2 scale-[0.985] opacity-0"
   }`.trim();
 }
+
+const bookingColumns: ColumnDef<(typeof bookingRows)[number]>[] = [
+  {
+    accessorKey: "customer",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Customer" />
+    ),
+  },
+  {
+    accessorKey: "service",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Service" />
+    ),
+  },
+  {
+    accessorKey: "slot",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Slot" />,
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Status" />
+    ),
+    cell: ({ row }) => (
+      <Badge variant={row.original.badgeVariant}>{row.original.status}</Badge>
+    ),
+  },
+];
 
 export function LandingProductDemo() {
   const [activeTab, setActiveTab] = useState<DemoTabId>("chat");
@@ -271,32 +303,11 @@ export function LandingProductDemo() {
                 <div className="stat-value text-accent">21</div>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table table-zebra table-sm">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Service</th>
-                    <th>Slot</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookingRows.map((booking) => (
-                    <tr key={`${booking.customer}-${booking.slot}`}>
-                      <td>{booking.customer}</td>
-                      <td>{booking.service}</td>
-                      <td>{booking.slot}</td>
-                      <td>
-                        <span className={`badge ${booking.badge}`.trim()}>
-                          {booking.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={bookingColumns}
+              data={bookingRows}
+              initialSorting={[{ id: "customer", desc: false }]}
+            />
           </div>
         </div>
 

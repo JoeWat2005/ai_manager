@@ -1,7 +1,10 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import {
   Select,
   SelectContent,
@@ -10,14 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 type NotificationStatus = "unread" | "read" | "archived";
 
@@ -38,6 +33,84 @@ export function NotificationsPanel({ initialNotifications }: Props) {
   const [notifications, setNotifications] = useState(initialNotifications);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const columns: ColumnDef<NotificationItem>[] = [
+    {
+      accessorKey: "title",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Event" />
+      ),
+      cell: ({ row }) => (
+        <div className="flex min-w-56 flex-col gap-1">
+          <p className="font-semibold">{row.original.title}</p>
+          <p className="text-sm text-muted-foreground">{row.original.body}</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "type",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Type" />
+      ),
+      cell: ({ row }) => <Badge variant="outline">{row.original.type}</Badge>,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Status" />
+      ),
+      cell: ({ row }) => (
+        <Badge
+          variant={
+            row.original.status === "unread"
+              ? "default"
+              : row.original.status === "read"
+                ? "secondary"
+                : "outline"
+          }
+        >
+          {row.original.status}
+        </Badge>
+      ),
+    },
+    {
+      accessorFn: (item) => new Date(item.createdAt).getTime(),
+      id: "createdAt",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Created" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {new Date(row.original.createdAt).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      id: "action",
+      enableSorting: false,
+      header: "Action",
+      cell: ({ row }) => (
+        <Select
+          value={row.original.status}
+          disabled={savingId === row.original.id}
+          onValueChange={(value) =>
+            updateStatus(row.original.id, value as NotificationStatus)
+          }
+        >
+          <SelectTrigger size="sm" className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="unread">Unread</SelectItem>
+              <SelectItem value="read">Read</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      ),
+    },
+  ];
 
   async function updateStatus(id: string, status: NotificationStatus) {
     setSavingId(id);
@@ -72,75 +145,12 @@ export function NotificationsPanel({ initialNotifications }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Event</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {notifications.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell className="align-top">
-                <div className="flex min-w-56 flex-col gap-1">
-                  <p className="font-semibold">{item.title}</p>
-                  <p className="text-sm text-muted-foreground">{item.body}</p>
-                </div>
-              </TableCell>
-              <TableCell className="align-top">
-                <Badge variant="outline">{item.type}</Badge>
-              </TableCell>
-              <TableCell className="align-top">
-                <Badge
-                  variant={
-                    item.status === "unread"
-                      ? "default"
-                      : item.status === "read"
-                        ? "secondary"
-                        : "outline"
-                  }
-                >
-                  {item.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="align-top text-sm text-muted-foreground">
-                {new Date(item.createdAt).toLocaleString()}
-              </TableCell>
-              <TableCell className="align-top">
-                <Select
-                  value={item.status}
-                  disabled={savingId === item.id}
-                  onValueChange={(value) =>
-                    updateStatus(item.id, value as NotificationStatus)
-                  }
-                >
-                  <SelectTrigger size="sm" className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="unread">Unread</SelectItem>
-                      <SelectItem value="read">Read</SelectItem>
-                      <SelectItem value="archived">Archived</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-            </TableRow>
-          ))}
-          {notifications.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                No notifications yet.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={notifications}
+        emptyMessage="No notifications yet."
+        initialSorting={[{ id: "createdAt", desc: true }]}
+      />
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
     </div>
