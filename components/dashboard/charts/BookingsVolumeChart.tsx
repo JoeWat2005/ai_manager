@@ -7,6 +7,8 @@ type BookingsVolumeChartProps = {
   labels: string[];
   newBookings: number[];
   completedBookings: number[];
+  newSeriesName?: string;
+  completedSeriesName?: string;
 };
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -15,6 +17,8 @@ export function BookingsVolumeChart({
   labels,
   newBookings,
   completedBookings,
+  newSeriesName = "New bookings",
+  completedSeriesName = "Completed",
 }: BookingsVolumeChartProps) {
   const options: ApexOptions = {
     chart: {
@@ -62,8 +66,8 @@ export function BookingsVolumeChart({
     <Chart
       options={options}
       series={[
-        { name: "New bookings", data: newBookings },
-        { name: "Completed", data: completedBookings },
+        { name: newSeriesName, data: newBookings },
+        { name: completedSeriesName, data: completedBookings },
       ]}
       type="area"
       height={320}

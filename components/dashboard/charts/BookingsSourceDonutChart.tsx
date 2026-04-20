@@ -10,11 +10,15 @@ type SourceItem = {
 
 type BookingsSourceDonutChartProps = {
   items: SourceItem[];
+  totalLabel?: string;
 };
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-export function BookingsSourceDonutChart({ items }: BookingsSourceDonutChartProps) {
+export function BookingsSourceDonutChart({
+  items,
+  totalLabel = "Bookings",
+}: BookingsSourceDonutChartProps) {
   const options: ApexOptions = {
     chart: {
       type: "donut",
@@ -38,7 +42,7 @@ export function BookingsSourceDonutChart({ items }: BookingsSourceDonutChartProp
             show: true,
             total: {
               show: true,
-              label: "Bookings",
+              label: totalLabel,
               formatter: () =>
                 `${items.reduce((total, item) => total + item.value, 0)}`,
             },

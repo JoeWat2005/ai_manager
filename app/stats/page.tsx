@@ -59,8 +59,8 @@ export default async function StatsPage() {
     orgCount > 0 ? (membershipCount / orgCount).toFixed(1) : "0.0";
 
   return (
-    <div data-theme="corporate" className="min-h-screen bg-base-100">
-      <main className="mx-auto w-full max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+    <div data-theme="light" className="min-h-screen bg-base-200/50">
+      <main className="app-shell space-y-8 py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold tracking-wide uppercase text-primary">

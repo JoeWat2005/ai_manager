@@ -1,11 +1,11 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, winter, corporate;
+  themes: light --default, corporate;
 }
 
 :root {
   --background: #ffffff;
-  --foreground: #000000;
+  --foreground: #111827;
 }
 
 @theme inline {
@@ -15,19 +15,73 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   padding: 0;
+  background: var(--background);
+  color: var(--foreground);
+  text-rendering: optimizeLegibility;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in oklab, #2563eb 75%, #ffffff);
+  outline-offset: 2px;
+}
+
+html[data-a11y-text="large"] {
+  font-size: 17px;
+}
+
+html[data-a11y-contrast="high"] {
+  --background: #ffffff;
+  --foreground: #000000;
+}
+
+html[data-a11y-contrast="high"] body {
+  background: #ffffff;
+  color: #000000;
+}
+
+html[data-a11y-contrast="high"] :is(.card, .alert, .table, .btn, .input, .textarea, .select) {
+  border-color: #000000 !important;
+  color: #000000 !important;
+}
+
+html[data-a11y-contrast="high"] .btn-primary {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+html[data-a11y-motion="reduce"] {
+  scroll-behavior: auto !important;
+}
+
+html[data-a11y-motion="reduce"] *,
+html[data-a11y-motion="reduce"] *::before,
+html[data-a11y-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.app-shell {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+.app-card {
+  @apply card border border-base-300 bg-base-100 shadow-sm;
+}
+
+.app-title {
+  @apply text-3xl font-bold tracking-tight text-base-content;
+}
+
+.app-subtitle {
+  @apply text-sm text-base-content/70;
 }
 
 .landing-fade-up {
@@ -54,6 +108,34 @@ html {
   animation: landing-fade-up 320ms ease-out both;
 }
 
+.desk-grid-ambient {
+  background-image: linear-gradient(
+      to right,
+      color-mix(in oklab, #94a3b8 20%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, #94a3b8 20%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 20%, black 20%, transparent 78%);
+  opacity: 0.45;
+}
+
+.desk-rise {
+  animation: desk-rise 720ms ease-out both;
+}
+
+.desk-rise-delay {
+  animation: desk-rise 720ms ease-out 120ms both;
+}
+
+.desk-rise-card {
+  animation: desk-rise 720ms ease-out both;
+}
+
 @media (max-width: 767px) {
   .brand-marquee-track {
     animation: none;
@@ -70,7 +152,10 @@ html {
   .landing-fade-up-delay-2,
   .landing-orb,
   .brand-marquee-track,
-  .landing-demo-panel {
+  .landing-demo-panel,
+  .desk-rise,
+  .desk-rise-delay,
+  .desk-rise-card {
     animation: none;
   }
 }
@@ -104,5 +189,16 @@ html {
   }
   100% {
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes desk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ReceptionChannel {
+  phone
+  web
+}
+
+enum ReceptionLeadStatus {
+  new
+  contacted
+  closed
+}
+
 model User {
   id          String                   @id @default(cuid())
   clerkUserId String                   @unique
@@ -23,6 +34,9 @@ model Organization {
 
   memberships  OrganizationMembership[]
   subscription Subscription?
+  receptionistConfig ReceptionistConfig?
+  receptionLeads ReceptionLead[]
+  receptionConversations ReceptionConversation[]
 }
 
 model OrganizationMembership {
@@ -60,4 +74,63 @@ model SubscriptionItem {
   subscription          Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
+}
+
+model ReceptionistConfig {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  phoneExtension    String   @unique
+  notificationEmail String
+  businessHoursJson Json
+  faqScript         String   @default("")
+  transferPhone     String?
+  phoneEnabled      Boolean  @default(true)
+  chatEnabled       Boolean  @default(true)
+  timezone          String   @default("Europe/London")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model ReceptionLead {
+  id                      String              @id @default(cuid())
+  organizationId          String
+  channel                 ReceptionChannel
+  name                    String?
+  phone                   String?
+  intent                  String?
+  preferredCallbackWindow String?
+  callbackReason          String?
+  qualified               Boolean             @default(false)
+  status                  ReceptionLeadStatus @default(new)
+  providerConversationId  String?
+  transcript              String?
+  metadataJson            Json?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+}
+
+model ReceptionConversation {
+  id                     String           @id @default(cuid())
+  organizationId         String
+  channel                ReceptionChannel
+  provider               String
+  providerConversationId String
+  outcome                String?
+  startedAt              DateTime?
+  endedAt                DateTime?
+  metadataJson           Json?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@unique([provider, providerConversationId])
 }
