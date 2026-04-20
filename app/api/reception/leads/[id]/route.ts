@@ -45,6 +45,16 @@ export async function PATCH(
 
   const lead = await prisma.receptionLead.update({
     where: { id: existing.id },
+    include: {
+      contact: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
     data: { status: body.status },
   });
 

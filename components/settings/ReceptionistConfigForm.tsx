@@ -1,6 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 export type ReceptionistConfigInput = {
   phoneExtension: string;
@@ -59,24 +71,20 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
   }
 
   return (
-    <section
-      id="settings-receptionist"
-      className="card border border-base-300 bg-base-100 shadow-sm"
-    >
-      <div className="card-body gap-5">
-        <div>
-          <h2 className="card-title">Receptionist Configuration</h2>
-          <p className="text-sm text-base-content/70">
-            Configure extension routing, notifications, and AI receptionist behavior.
-          </p>
-        </div>
-
-        <form onSubmit={saveConfig} className="space-y-4">
+    <Card id="settings-receptionist">
+      <CardHeader>
+        <CardTitle>Receptionist configuration</CardTitle>
+        <CardDescription>
+          Configure extension routing, notifications, and AI receptionist behavior.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <form onSubmit={saveConfig} className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="form-control">
-              <span className="label-text">4-digit phone extension</span>
-              <input
-                className="input input-bordered"
+            <div className="space-y-1.5">
+              <Label htmlFor="reception-phone-extension">4-digit phone extension</Label>
+              <Input
+                id="reception-phone-extension"
                 value={config.phoneExtension}
                 onChange={(event) =>
                   setConfig((previous) => ({
@@ -87,13 +95,13 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
                 pattern="\d{4}"
                 required
               />
-            </label>
+            </div>
 
-            <label className="form-control">
-              <span className="label-text">Notification email</span>
-              <input
+            <div className="space-y-1.5">
+              <Label htmlFor="reception-notification-email">Notification email</Label>
+              <Input
+                id="reception-notification-email"
                 type="email"
-                className="input input-bordered"
                 value={config.notificationEmail}
                 onChange={(event) =>
                   setConfig((previous) => ({
@@ -103,12 +111,12 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
                 }
                 required
               />
-            </label>
+            </div>
 
-            <label className="form-control">
-              <span className="label-text">Transfer phone (optional)</span>
-              <input
-                className="input input-bordered"
+            <div className="space-y-1.5">
+              <Label htmlFor="reception-transfer-phone">Transfer phone (optional)</Label>
+              <Input
+                id="reception-transfer-phone"
                 value={config.transferPhone ?? ""}
                 onChange={(event) =>
                   setConfig((previous) => ({
@@ -117,12 +125,12 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
                   }))
                 }
               />
-            </label>
+            </div>
 
-            <label className="form-control">
-              <span className="label-text">Timezone</span>
-              <input
-                className="input input-bordered"
+            <div className="space-y-1.5">
+              <Label htmlFor="reception-timezone">Timezone</Label>
+              <Input
+                id="reception-timezone"
                 value={config.timezone}
                 onChange={(event) =>
                   setConfig((previous) => ({
@@ -132,13 +140,14 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
                 }
                 required
               />
-            </label>
+            </div>
           </div>
 
-          <label className="form-control">
-            <span className="label-text">FAQ / assistant instructions</span>
-            <textarea
-              className="textarea textarea-bordered min-h-32"
+          <div className="space-y-1.5">
+            <Label htmlFor="reception-faq-script">FAQ / assistant instructions</Label>
+            <Textarea
+              id="reception-faq-script"
+              className="min-h-32"
               value={config.faqScript}
               onChange={(event) =>
                 setConfig((previous) => ({
@@ -147,55 +156,67 @@ export function ReceptionistConfigForm({ initialConfig }: Props) {
                 }))
               }
             />
-          </label>
-
-          <div className="flex flex-wrap gap-4">
-            <label className="label cursor-pointer gap-2">
-              <span className="label-text">Phone enabled</span>
-              <input
-                type="checkbox"
-                className="toggle toggle-primary"
-                checked={config.phoneEnabled}
-                onChange={(event) =>
-                  setConfig((previous) => ({
-                    ...previous,
-                    phoneEnabled: event.target.checked,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="label cursor-pointer gap-2">
-              <span className="label-text">Web chat enabled</span>
-              <input
-                type="checkbox"
-                className="toggle toggle-primary"
-                checked={config.chatEnabled}
-                onChange={(event) =>
-                  setConfig((previous) => ({
-                    ...previous,
-                    chatEnabled: event.target.checked,
-                  }))
-                }
-              />
-            </label>
           </div>
 
-          <button className="btn btn-primary" disabled={savingConfig}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="reception-phone-enabled">Phone enabled</Label>
+                <p className="text-sm text-muted-foreground">
+                  Accept AI-assisted phone reception on your shared number extension.
+                </p>
+              </div>
+              <Switch
+                id="reception-phone-enabled"
+                checked={config.phoneEnabled}
+                onCheckedChange={(checked) =>
+                  setConfig((previous) => ({
+                    ...previous,
+                    phoneEnabled: checked,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="reception-chat-enabled">Web chat enabled</Label>
+                <p className="text-sm text-muted-foreground">
+                  Let visitors book or qualify through the landing page assistant.
+                </p>
+              </div>
+              <Switch
+                id="reception-chat-enabled"
+                checked={config.chatEnabled}
+                onCheckedChange={(checked) =>
+                  setConfig((previous) => ({
+                    ...previous,
+                    chatEnabled: checked,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          <Button type="submit" disabled={savingConfig}>
             {savingConfig ? "Saving..." : "Save receptionist settings"}
-          </button>
+          </Button>
         </form>
 
         {(message || error) && (
           <div
-            className={`alert ${error ? "alert-error" : "alert-success"}`}
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              error
+                ? "border-destructive/30 bg-destructive/5 text-destructive"
+                : "border-primary/20 bg-primary/5 text-primary"
+            }`}
             role={error ? "alert" : "status"}
             aria-live="polite"
           >
             <span>{error ?? message}</span>
           </div>
         )}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

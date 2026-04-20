@@ -6,10 +6,14 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-type ReceptionAwareClient = {
+type MvpAwareClient = {
+  organizationContact?: unknown;
   receptionistConfig?: unknown;
   receptionLead?: unknown;
   receptionConversation?: unknown;
+  bookingSettings?: unknown;
+  organizationLinkProfile?: unknown;
+  organizationPageCustomization?: unknown;
 };
 
 function createPrismaClient() {
@@ -24,27 +28,31 @@ function createPrismaClient() {
   });
 }
 
-function hasReceptionModels(client: PrismaClient): boolean {
-  const candidate = client as unknown as ReceptionAwareClient;
+function hasMvpModels(client: PrismaClient): boolean {
+  const candidate = client as unknown as MvpAwareClient;
   return (
+    typeof candidate.organizationContact !== "undefined" &&
     typeof candidate.receptionistConfig !== "undefined" &&
     typeof candidate.receptionLead !== "undefined" &&
-    typeof candidate.receptionConversation !== "undefined"
+    typeof candidate.receptionConversation !== "undefined" &&
+    typeof candidate.bookingSettings !== "undefined" &&
+    typeof candidate.organizationLinkProfile !== "undefined" &&
+    typeof candidate.organizationPageCustomization !== "undefined"
   );
 }
 
 function getPrismaClient(): PrismaClient {
   const existing = globalForPrisma.prisma;
 
-  if (existing && hasReceptionModels(existing)) {
+  if (existing && hasMvpModels(existing)) {
     return existing;
   }
 
   const fresh = createPrismaClient();
 
-  if (!hasReceptionModels(fresh)) {
+  if (!hasMvpModels(fresh)) {
     console.warn(
-      "[Prisma bootstrap] Client appears stale and does not include receptionist models. Run `npx prisma generate` and restart the dev server."
+      "[Prisma bootstrap] Client appears stale and does not include MVP models. Run `npx prisma generate` and restart the dev server."
     );
   }
 
@@ -60,3 +68,4 @@ export const prisma = getPrismaClient();
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+

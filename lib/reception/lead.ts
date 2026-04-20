@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { createNotificationEvent } from "@/lib/dashboard/events";
+import { upsertOrganizationContact } from "@/lib/contacts/service";
 import { sendQualifiedLeadNotification } from "./notify";
 import { EMPTY_LEAD_DRAFT } from "./defaults";
 import { LeadDraft } from "./types";
@@ -63,6 +65,11 @@ export async function createOrUpdateLead(input: LeadCaptureInput) {
   const normalizedDraft = normalizeLeadDraft(input.draft);
   const qualified = isQualifiedLeadDraft(normalizedDraft);
   const providerConversationId = nonEmpty(input.providerConversationId);
+  const contact = await upsertOrganizationContact({
+    organizationId: input.organizationId,
+    name: normalizedDraft.name,
+    phone: normalizedDraft.phone,
+  });
 
   const existingLead = providerConversationId
     ? await prisma.receptionLead.findFirst({
@@ -76,9 +83,8 @@ export async function createOrUpdateLead(input: LeadCaptureInput) {
 
   const data = {
     organizationId: input.organizationId,
+    contactId: contact?.id ?? null,
     channel: input.channel,
-    name: normalizedDraft.name,
-    phone: normalizedDraft.phone,
     intent: normalizedDraft.intent,
     preferredCallbackWindow: normalizedDraft.preferredCallbackWindow,
     callbackReason: normalizedDraft.callbackReason,
@@ -96,18 +102,51 @@ export async function createOrUpdateLead(input: LeadCaptureInput) {
     ? await prisma.receptionLead.update({
         where: { id: existingLead.id },
         data,
+        include: {
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
       })
-    : await prisma.receptionLead.create({ data });
+    : await prisma.receptionLead.create({
+        data,
+        include: {
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      });
 
-  if (qualified && lead.name && lead.phone && lead.intent) {
+  if (qualified && lead.contact?.name && lead.contact?.phone && lead.intent) {
     const notifyResult = await sendQualifiedLeadNotification({
       toEmail: input.notificationEmail,
       organizationName: input.organizationName,
       channel: input.channel,
-      name: lead.name,
-      phone: lead.phone,
+      name: lead.contact.name,
+      phone: lead.contact.phone,
       intent: lead.intent,
       callbackWindow: lead.preferredCallbackWindow,
+    });
+
+    await createNotificationEvent({
+      organizationId: input.organizationId,
+      type: "lead_captured",
+      title: "Qualified lead captured",
+      body: `${lead.contact.name} requested a callback via ${lead.channel}.`,
+      metadataJson: {
+        leadId: lead.id,
+        channel: lead.channel,
+      },
     });
 
     console.log("[Reception lead] Qualified lead stored", {
@@ -115,7 +154,7 @@ export async function createOrUpdateLead(input: LeadCaptureInput) {
       channel: lead.channel,
       notifySent: notifyResult.sent,
       notifyReason: notifyResult.reason ?? null,
-      phone: redactPhone(lead.phone),
+      phone: redactPhone(lead.contact.phone),
     });
   }
 

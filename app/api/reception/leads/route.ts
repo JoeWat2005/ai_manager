@@ -20,6 +20,16 @@ export async function GET(req: Request) {
       organizationId: access.organization.id,
       ...(status ? { status: status as "new" | "contacted" | "closed" } : {}),
     },
+    include: {
+      contact: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: limit,
   });

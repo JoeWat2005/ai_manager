@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { trackGaEvent } from "@/lib/analytics/ga";
 
 type LeadDraft = {
   name: string | null;
@@ -39,11 +40,17 @@ export function WebChatWidget({ slug }: { slug: string }) {
     callbackReason: null,
   });
   const [qualified, setQualified] = useState(false);
+  const [chatStarted, setChatStarted] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || loading) return;
+
+    if (!chatStarted) {
+      trackGaEvent("chat_started", { channel: "web" });
+      setChatStarted(true);
+    }
 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setInput("");
@@ -80,7 +87,11 @@ export function WebChatWidget({ slug }: { slug: string }) {
       const assistantMessage = data.assistantMessage;
 
       setDraft(data.draft ?? draft);
+      const becameQualified = Boolean(data.qualified) && !qualified;
       setQualified(!!data.qualified);
+      if (becameQualified) {
+        trackGaEvent("lead_qualified", { channel: "web" });
+      }
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: assistantMessage },
@@ -172,3 +183,4 @@ export function WebChatWidget({ slug }: { slug: string }) {
     </section>
   );
 }
+

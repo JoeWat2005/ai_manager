@@ -2,8 +2,10 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { getAccessibilityBootScript } from "@/lib/accessibility/preferences";
 import { clerkAppearance } from "@/lib/clerk/appearance";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -48,8 +50,13 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: getAccessibilityBootScript() }}
           />
         </head>
-        <body className="min-h-full bg-base-100 text-base-content">{children}</body>
+        <body className="min-h-full bg-base-100 text-base-content">
+          {children}
+          <Toaster position="bottom-right" richColors />
+          <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+        </body>
       </html>
     </ClerkProvider>
   );
 }
+

@@ -2,11 +2,20 @@ import Link from "next/link";
 import { PricingTable } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { AccessibilityPreferencesCard } from "@/components/settings/AccessibilityPreferencesCard";
 import {
   ReceptionistConfigForm,
   type ReceptionistConfigInput,
 } from "@/components/settings/ReceptionistConfigForm";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   getOrCreateReceptionistConfig,
   getOrganizationByClerkOrgId,
@@ -56,77 +65,78 @@ export default async function SettingsPage({
 
   return (
     <main className="space-y-6">
-      <section className="app-card">
-        <div className="card-body gap-3">
-          <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
-            Settings
-          </p>
-          <h1 className="app-title">Workspace settings</h1>
-          <p className="app-subtitle">
-            Manage business profile details, receptionist behavior, and accessibility.
-          </p>
-        </div>
-      </section>
+      <DashboardPageHeader
+        eyebrow="Settings"
+        title="Workspace settings"
+        description="Manage business profile details, receptionist behavior, and accessibility."
+      />
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <article className="app-card">
-          <div className="card-body">
-            <h2 className="card-title">Business profile</h2>
-            <dl className="mt-1 space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4 border-b border-base-300 pb-2">
-                <dt className="text-base-content/70">Business name</dt>
-                <dd className="font-semibold text-base-content">{organization.name}</dd>
+        <Card>
+          <CardHeader>
+            <CardTitle>Business profile</CardTitle>
+            <CardDescription>Core workspace identity and public route details.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
+                <dt className="text-muted-foreground">Business name</dt>
+                <dd className="font-semibold text-foreground">{organization.name}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4 border-b border-base-300 pb-2">
-                <dt className="text-base-content/70">Slug</dt>
-                <dd className="font-semibold text-base-content">{organization.slug}</dd>
+              <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
+                <dt className="text-muted-foreground">Slug</dt>
+                <dd className="font-semibold text-foreground">{organization.slug}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4 border-b border-base-300 pb-2">
-                <dt className="text-base-content/70">Plan status</dt>
+              <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
+                <dt className="text-muted-foreground">Plan status</dt>
                 <dd>
-                  <span
-                    className={`badge ${
-                      organization.hasPaidPlan ? "badge-primary" : "badge-outline"
-                    }`.trim()}
-                  >
+                  <Badge variant={organization.hasPaidPlan ? "default" : "outline"}>
                     {organization.hasPaidPlan ? "Pro" : "Free"}
-                  </span>
+                  </Badge>
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <dt className="text-base-content/70">Public landing</dt>
+                <dt className="text-muted-foreground">Public landing</dt>
                 <dd>
-                  <Link href={`/${organization.slug}/landing`} className="link link-primary">
+                  <Link
+                    href={`/${organization.slug}/landing`}
+                    className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  >
                     View page
                   </Link>
                 </dd>
               </div>
             </dl>
-          </div>
-        </article>
+          </CardContent>
+        </Card>
 
-        <article className="app-card">
-          <div className="card-body">
-            <h2 className="card-title">Operations defaults</h2>
-            <dl className="mt-1 space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4 border-b border-base-300 pb-2">
-                <dt className="text-base-content/70">Timezone</dt>
-                <dd className="font-semibold text-base-content">{timezone}</dd>
+        <Card>
+          <CardHeader>
+            <CardTitle>Operations defaults</CardTitle>
+            <CardDescription>
+              Shared operational settings and access rules for your workspace.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
+                <dt className="text-muted-foreground">Timezone</dt>
+                <dd className="font-semibold text-foreground">{timezone}</dd>
               </div>
-              <div className="flex items-center justify-between gap-4 border-b border-base-300 pb-2">
-                <dt className="text-base-content/70">Lead notifications</dt>
-                <dd className="font-semibold text-base-content">{notificationEmail}</dd>
+              <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
+                <dt className="text-muted-foreground">Lead notifications</dt>
+                <dd className="font-semibold text-foreground">{notificationEmail}</dd>
               </div>
               <div>
-                <dt className="text-base-content/70">Security and access</dt>
-                <dd className="mt-2 text-base-content/80">
+                <dt className="text-muted-foreground">Security and access</dt>
+                <dd className="mt-2 text-foreground/80">
                   Organization permissions are managed through Clerk organizations, and
                   receptionist APIs enforce strict org scoping.
                 </dd>
               </div>
             </dl>
-          </div>
-        </article>
+          </CardContent>
+        </Card>
       </section>
 
       <AccessibilityPreferencesCard />
@@ -134,18 +144,20 @@ export default async function SettingsPage({
       {organization.hasPaidPlan && receptionistConfig ? (
         <ReceptionistConfigForm initialConfig={receptionistConfig} />
       ) : (
-        <section className="app-card">
-          <div className="card-body gap-4">
-            <h2 className="card-title">Receptionist Configuration</h2>
-            <p className="text-sm text-base-content/70">
+        <Card>
+          <CardHeader>
+            <CardTitle>Receptionist configuration</CardTitle>
+            <CardDescription>
               Receptionist phone and chat configuration is available on paid plans.
-            </p>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <PricingTable
               for="organization"
               newSubscriptionRedirectUrl={`/${organization.slug}/dashboard/settings`}
             />
-          </div>
-        </section>
+          </CardContent>
+        </Card>
       )}
     </main>
   );

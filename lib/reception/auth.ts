@@ -1,39 +1,31 @@
-import { auth } from "@clerk/nextjs/server";
-import { getOrganizationByClerkOrgId, getOrgNotificationFallbackEmail } from "./org";
-import { getOrCreateReceptionistConfig } from "./org";
+import { prisma } from "@/lib/prisma";
+import { requireDashboardApiOrg } from "@/lib/dashboard/access";
+import { getOrgNotificationFallbackEmail, getOrCreateReceptionistConfig } from "./org";
 
 export async function requireAuthedOrganization() {
-  const { userId, orgId } = await auth();
-  if (!userId || !orgId) {
-    return { ok: false as const, response: Response.json({ ok: false, error: "Unauthorized" }, { status: 401 }) };
+  const access = await requireDashboardApiOrg({ requirePaidPlan: true });
+  if (!access.ok) {
+    return access;
   }
 
-  const organization = await getOrganizationByClerkOrgId(orgId);
-  if (!organization) {
-    return {
-      ok: false as const,
-      response: Response.json({ ok: false, error: "Organization not found" }, { status: 404 }),
-    };
-  }
+  // Run existing-config lookup and user-email lookup in parallel.
+  // In the happy path (config already exists) this eliminates one sequential round-trip.
+  const [existingConfig, fallbackEmail] = await Promise.all([
+    prisma.receptionistConfig.findUnique({
+      where: { organizationId: access.organization.id },
+    }),
+    getOrgNotificationFallbackEmail(access.userId),
+  ]);
 
-  if (!organization.hasPaidPlan) {
-    return {
-      ok: false as const,
-      response: Response.json(
-        { ok: false, error: "Receptionist is available on paid plans only" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  const fallbackEmail = await getOrgNotificationFallbackEmail(userId);
-  const config = await getOrCreateReceptionistConfig(organization.id, fallbackEmail);
+  const config =
+    existingConfig ??
+    (await getOrCreateReceptionistConfig(access.organization.id, fallbackEmail));
 
   return {
     ok: true as const,
-    organization,
-    userId,
-    orgId,
+    organization: access.organization,
+    userId: access.userId,
+    orgId: access.orgId,
     config,
   };
 }

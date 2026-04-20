@@ -1,10 +1,11 @@
+import { createNotificationEvent } from "@/lib/dashboard/events";
+import { appendConversationMessages, upsertCallRecording, upsertReceptionConversation } from "./conversation";
 import { createOrUpdateLead } from "./lead";
 import {
   getOrCreateReceptionistConfig,
   getOrganizationByPhoneExtension,
   getOrganizationBySlug,
 } from "./org";
-import { upsertReceptionConversation } from "./conversation";
 import { normalizeBusinessHours, isWithinBusinessHours } from "./business-hours";
 
 type VoiceEventResult = {
@@ -52,6 +53,36 @@ function pickString(obj: unknown, paths: string[]): string | null {
       return cursor.trim();
     }
   }
+  return null;
+}
+
+function pickNumber(obj: unknown, paths: string[]): number | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+
+  for (const path of paths) {
+    const segments = path.split(".");
+    let cursor: unknown = record;
+    for (const segment of segments) {
+      if (!cursor || typeof cursor !== "object") {
+        cursor = null;
+        break;
+      }
+      cursor = (cursor as Record<string, unknown>)[segment];
+    }
+
+    if (typeof cursor === "number" && Number.isFinite(cursor)) {
+      return cursor;
+    }
+
+    if (typeof cursor === "string" && cursor.trim().length > 0) {
+      const parsed = Number(cursor.trim());
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -158,6 +189,23 @@ export async function handleVapiVoiceWebhook(req: Request): Promise<VoiceEventRe
   };
 
   const transcript = pickString(payload, ["transcript", "analysis.summary", "summary"]);
+  const recordingUrl = pickString(payload, [
+    "recording.url",
+    "recordingUrl",
+    "call.recordingUrl",
+    "call.recording.url",
+  ]);
+  const recordingProvider = pickString(payload, [
+    "recording.provider",
+    "call.recording.provider",
+    "recordingProvider",
+  ]);
+  const recordingDuration = pickNumber(payload, [
+    "recording.durationSeconds",
+    "call.durationSeconds",
+    "analysis.durationSeconds",
+  ]);
+
   const now = new Date();
   const inBusinessHours = isWithinBusinessHours(
     normalizeBusinessHours(config.businessHoursJson),
@@ -189,8 +237,9 @@ export async function handleVapiVoiceWebhook(req: Request): Promise<VoiceEventRe
     draft: leadDraft,
   });
 
-  await upsertReceptionConversation({
+  const conversation = await upsertReceptionConversation({
     organizationId: org.id,
+    leadId: lead.id,
     channel: "phone",
     provider: "vapi",
     providerConversationId: conversationId,
@@ -199,6 +248,44 @@ export async function handleVapiVoiceWebhook(req: Request): Promise<VoiceEventRe
     endedAt: now,
     metadataJson: payload,
   });
+
+  if (transcript) {
+    await appendConversationMessages([
+      {
+        conversationId: conversation.id,
+        role: "user",
+        content: transcript,
+        metadataJson: {
+          source: "voice-transcript",
+        },
+      },
+    ]);
+  }
+
+  if (recordingUrl || transcript) {
+    await upsertCallRecording({
+      conversationId: conversation.id,
+      recordingUrl,
+      storageProvider: recordingProvider,
+      durationSeconds: recordingDuration,
+      transcriptText: transcript,
+      transcriptSummary: pickString(payload, ["analysis.summary", "summary"]),
+      metadataJson: {
+        eventType,
+      },
+    });
+
+    await createNotificationEvent({
+      organizationId: org.id,
+      type: "transcript_ready",
+      title: "Call transcript ready",
+      body: `Call transcript captured for ${org.name}`,
+      metadataJson: {
+        conversationId: conversation.id,
+        leadId: lead.id,
+      },
+    });
+  }
 
   return {
     ok: true,
@@ -219,3 +306,4 @@ export async function handleVapiVoiceWebhook(req: Request): Promise<VoiceEventRe
     },
   };
 }
+

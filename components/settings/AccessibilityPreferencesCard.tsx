@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   ACCESSIBILITY_STORAGE_KEY,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -17,98 +20,78 @@ function applyPreferencesToDocument(preferences: AccessibilityPreferences) {
 
 export function AccessibilityPreferencesCard() {
   const [preferences, setPreferences] = useState<AccessibilityPreferences>(() => {
-    if (typeof window === "undefined") {
-      return DEFAULT_ACCESSIBILITY_PREFERENCES;
-    }
-
-    let initial = DEFAULT_ACCESSIBILITY_PREFERENCES;
+    if (typeof window === "undefined") return DEFAULT_ACCESSIBILITY_PREFERENCES;
     try {
       const raw = window.localStorage.getItem(ACCESSIBILITY_STORAGE_KEY);
-      if (raw) {
-        initial = normalizeAccessibilityPreferences(JSON.parse(raw));
-      }
-    } catch (error) {
-      console.warn("Failed to load accessibility preferences", error);
+      if (raw) return normalizeAccessibilityPreferences(JSON.parse(raw));
+    } catch {
+      /* ignore */
     }
-
-    return initial;
+    return DEFAULT_ACCESSIBILITY_PREFERENCES;
   });
 
   useEffect(() => {
     applyPreferencesToDocument(preferences);
-
     try {
-      window.localStorage.setItem(
-        ACCESSIBILITY_STORAGE_KEY,
-        JSON.stringify(preferences)
-      );
-    } catch (error) {
-      console.warn("Failed to persist accessibility preferences", error);
+      window.localStorage.setItem(ACCESSIBILITY_STORAGE_KEY, JSON.stringify(preferences));
+    } catch {
+      /* ignore */
     }
   }, [preferences]);
 
-  function updatePreference<K extends keyof AccessibilityPreferences>(
-    key: K,
-    value: AccessibilityPreferences[K]
-  ) {
-    setPreferences((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
+  function update<K extends keyof AccessibilityPreferences>(key: K, value: AccessibilityPreferences[K]) {
+    setPreferences((prev) => ({ ...prev, [key]: value }));
   }
 
+  const rows: { key: keyof AccessibilityPreferences; label: string; description: string }[] = [
+    {
+      key: "highContrast",
+      label: "High contrast",
+      description: "Increases foreground/background contrast ratios across the app.",
+    },
+    {
+      key: "reduceMotion",
+      label: "Reduce motion",
+      description: "Disables entrance animations, transitions, and auto-scrolling.",
+    },
+    {
+      key: "largeText",
+      label: "Larger text",
+      description: "Increases base font size from 16 px to 17 px site-wide.",
+    },
+  ];
+
   return (
-    <section className="card border border-base-300 bg-base-100 shadow-sm">
-      <div className="card-body gap-5">
-        <div>
-          <h2 className="card-title">Accessibility Preferences</h2>
-          <p className="text-sm text-base-content/70">
-            Controls are stored in this browser and applied across the app.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <label className="label cursor-pointer justify-start gap-3 rounded-xl border border-base-300 px-3 py-2">
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={preferences.highContrast}
-              onChange={(event) =>
-                updatePreference("highContrast", event.target.checked)
-              }
+    <Card>
+      <CardHeader>
+        <CardTitle>Accessibility preferences</CardTitle>
+        <CardDescription>
+          Stored in this browser and applied immediately across the app.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {rows.map(({ key, label, description }) => (
+          <div
+            key={key}
+            className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3"
+          >
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor={`a11y-${key}`} className="cursor-pointer font-medium">
+                {label}
+              </Label>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+            <Switch
+              id={`a11y-${key}`}
+              checked={preferences[key] as boolean}
+              onCheckedChange={(checked) => update(key, checked as AccessibilityPreferences[typeof key])}
             />
-            <span className="label-text">High contrast mode</span>
-          </label>
-
-          <label className="label cursor-pointer justify-start gap-3 rounded-xl border border-base-300 px-3 py-2">
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={preferences.reduceMotion}
-              onChange={(event) =>
-                updatePreference("reduceMotion", event.target.checked)
-              }
-            />
-            <span className="label-text">Reduce motion</span>
-          </label>
-
-          <label className="label cursor-pointer justify-start gap-3 rounded-xl border border-base-300 px-3 py-2">
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={preferences.largeText}
-              onChange={(event) =>
-                updatePreference("largeText", event.target.checked)
-              }
-            />
-            <span className="label-text">Larger text</span>
-          </label>
-        </div>
-
+          </div>
+        ))}
         <p className="sr-only" aria-live="polite">
           Accessibility preferences updated.
         </p>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

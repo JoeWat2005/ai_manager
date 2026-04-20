@@ -1,4 +1,8 @@
 import { normalizeBusinessHours, isWithinBusinessHours } from "./business-hours";
+import {
+  appendConversationMessages,
+  upsertReceptionConversation,
+} from "./conversation";
 import { getReceptionAssistantProvider } from "./llm";
 import {
   createOrUpdateLead,
@@ -64,6 +68,36 @@ export async function handleChatTurn(
     draft: updatedDraft,
   });
 
+  const conversation = await upsertReceptionConversation({
+    organizationId: input.organizationId,
+    leadId: lead.id,
+    channel: "web",
+    provider: "web-chat",
+    providerConversationId: input.sessionId,
+    outcome: qualified ? "qualified_lead" : "in_progress",
+    startedAt: null,
+    endedAt: qualified ? new Date() : null,
+    metadataJson: {
+      escalationRequested: assistantReply.shouldEscalate,
+      inBusinessHours,
+    },
+  });
+
+  await appendConversationMessages([
+    {
+      conversationId: conversation.id,
+      role: "user",
+      content: input.message,
+    },
+    {
+      conversationId: conversation.id,
+      role: "assistant",
+      content: qualified
+        ? "Thanks. We have your details and will call you back shortly."
+        : assistantReply.message,
+    },
+  ]);
+
   const nextFieldsNeeded = getMissingLeadFields(updatedDraft);
 
   return {
@@ -77,3 +111,4 @@ export async function handleChatTurn(
     qualified: lead.qualified,
   };
 }
+

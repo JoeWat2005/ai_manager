@@ -1,9 +1,16 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { BookingsSourceDonutChart } from "@/components/dashboard/charts/BookingsSourceDonutChart";
 import { BookingsVolumeChart } from "@/components/dashboard/charts/BookingsVolumeChart";
-import { prisma } from "@/lib/prisma";
-import { getOrganizationByClerkOrgId } from "@/lib/reception/org";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { getAnalyticsData } from "@/lib/dashboard/analytics";
+import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 
 type DayPoint = {
   key: string;
@@ -21,59 +28,30 @@ export default async function AnalyticsPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { userId, orgId } = await auth();
   const { slug } = await params;
+  const { organization } = await requireDashboardPageOrg(slug);
 
-  if (!userId || !orgId) {
-    redirect("/sign-in");
+  // Cached for 5 minutes per org — avoids hitting the DB on every page load.
+  // Cache key: ["analytics-leads", organization.id]
+  const { statusGrouped, recentLeads } = await getAnalyticsData(organization.id);
+
+  // Derive all aggregates from the single groupBy result
+  let totalLeads = 0;
+  let qualifiedLeads = 0;
+  let contactedLeads = 0;
+  let closedLeads = 0;
+  const channelMap = new Map<string, number>();
+
+  for (const row of statusGrouped) {
+    const n = row._count._all;
+    totalLeads += n;
+    if (row.qualified) qualifiedLeads += n;
+    if (row.status === "contacted") contactedLeads += n;
+    if (row.status === "closed") closedLeads += n;
+    channelMap.set(row.channel, (channelMap.get(row.channel) ?? 0) + n);
   }
 
-  const organization = await getOrganizationByClerkOrgId(orgId);
-  if (!organization) {
-    redirect("/onboarding");
-  }
-
-  if (organization.slug !== slug) {
-    redirect(`/${organization.slug}/dashboard/analytics`);
-  }
-
-  const windowStart = new Date();
-  windowStart.setHours(0, 0, 0, 0);
-  windowStart.setDate(windowStart.getDate() - 6);
-
-  const [totalLeads, qualifiedLeads, contactedLeads, closedLeads, channelCounts, recentLeads] =
-    await Promise.all([
-      prisma.receptionLead.count({
-        where: { organizationId: organization.id },
-      }),
-      prisma.receptionLead.count({
-        where: { organizationId: organization.id, qualified: true },
-      }),
-      prisma.receptionLead.count({
-        where: { organizationId: organization.id, status: "contacted" },
-      }),
-      prisma.receptionLead.count({
-        where: { organizationId: organization.id, status: "closed" },
-      }),
-      prisma.receptionLead.groupBy({
-        by: ["channel"],
-        where: { organizationId: organization.id },
-        _count: { _all: true },
-      }),
-      prisma.receptionLead.findMany({
-        where: {
-          organizationId: organization.id,
-          createdAt: {
-            gte: windowStart,
-          },
-        },
-        select: {
-          createdAt: true,
-          qualified: true,
-        },
-      }),
-    ]);
-
+  // Build 7-day trend
   const trendPoints: DayPoint[] = [];
   for (let offset = 6; offset >= 0; offset -= 1) {
     const day = new Date();
@@ -89,72 +67,73 @@ export default async function AnalyticsPage({
 
   const dayLookup = new Map(trendPoints.map((point) => [point.key, point]));
   for (const lead of recentLeads) {
-    const key = toDayKey(lead.createdAt);
+    const key = toDayKey(new Date(lead.createdAt));
     const point = dayLookup.get(key);
     if (!point) continue;
-
     point.inbound += 1;
-    if (lead.qualified) {
-      point.qualified += 1;
-    }
+    if (lead.qualified) point.qualified += 1;
   }
 
   const qualificationRate =
     totalLeads > 0 ? Math.round((qualifiedLeads / totalLeads) * 100) : 0;
   const contactRate =
     qualifiedLeads > 0 ? Math.round((contactedLeads / qualifiedLeads) * 100) : 0;
-  const closeRate = contactedLeads > 0 ? Math.round((closedLeads / contactedLeads) * 100) : 0;
+  const closeRate =
+    contactedLeads > 0 ? Math.round((closedLeads / contactedLeads) * 100) : 0;
 
-  const channelSplit = channelCounts.map((item) => ({
-    label: item.channel === "phone" ? "Phone" : "Web chat",
-    value: item._count._all,
-  }));
-
-  if (channelSplit.length === 0) {
-    channelSplit.push(
-      { label: "Phone", value: 0 },
-      { label: "Web chat", value: 0 }
-    );
-  }
+  const channelSplit =
+    channelMap.size > 0
+      ? [...channelMap.entries()].map(([channel, value]) => ({
+          label: channel === "phone" ? "Phone" : "Web chat",
+          value,
+        }))
+      : [
+          { label: "Phone", value: 0 },
+          { label: "Web chat", value: 0 },
+        ];
 
   return (
     <main className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-base-100 p-6 shadow-sm sm:p-8">
-        <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
-          Analytics
-        </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">
-          Reception performance insights
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Lead funnel and channel trends from your AI receptionist operation.
-        </p>
-      </section>
+      <DashboardPageHeader
+        eyebrow="Analytics"
+        title="Reception performance insights"
+        description="Lead funnel and channel trends from your AI receptionist operation."
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Total leads</p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{totalLeads}</p>
-        </article>
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Qualification rate</p>
-          <p className="mt-2 text-3xl font-black text-primary">{qualificationRate}%</p>
-        </article>
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Contact rate</p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{contactRate}%</p>
-        </article>
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Close rate</p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{closeRate}%</p>
-        </article>
+        <Card>
+          <CardHeader>
+            <CardDescription>Total leads</CardDescription>
+            <CardTitle className="text-3xl font-black">{totalLeads}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Qualification rate</CardDescription>
+            <CardTitle className="text-3xl font-black text-primary">{qualificationRate}%</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Contact rate</CardDescription>
+            <CardTitle className="text-3xl font-black">{contactRate}%</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>Close rate</CardDescription>
+            <CardTitle className="text-3xl font-black">{closeRate}%</CardTitle>
+          </CardHeader>
+        </Card>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-semibold">Inbound vs qualified (last 7 days)</h2>
-          <p className="text-sm text-slate-500">Track top-of-funnel quality each day</p>
-          <div className="mt-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Inbound vs qualified (last 7 days)</CardTitle>
+            <CardDescription>Track top-of-funnel quality each day.</CardDescription>
+          </CardHeader>
+          <CardContent>
             <BookingsVolumeChart
               labels={trendPoints.map((point) => point.label)}
               newBookings={trendPoints.map((point) => point.inbound)}
@@ -162,48 +141,51 @@ export default async function AnalyticsPage({
               newSeriesName="Inbound"
               completedSeriesName="Qualified"
             />
-          </div>
-        </article>
+          </CardContent>
+        </Card>
 
-        <article className="rounded-2xl border border-slate-200 bg-base-100 p-4 shadow-sm sm:p-5">
-          <h2 className="text-lg font-semibold">Channel split</h2>
-          <p className="text-sm text-slate-500">Where inbound conversations start</p>
-          <div className="mt-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Channel split</CardTitle>
+            <CardDescription>Where inbound conversations start.</CardDescription>
+          </CardHeader>
+          <CardContent>
             <BookingsSourceDonutChart items={channelSplit} totalLabel="Leads" />
-          </div>
-        </article>
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-base-100 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">Funnel health</h2>
-        <p className="text-sm text-slate-500">
-          Keep these conversion stages moving with daily ops reviews.
-        </p>
-
-        <div className="mt-4 space-y-4">
-          <div>
-            <div className="mb-1 flex items-center justify-between text-sm">
+      <Card>
+        <CardHeader>
+          <CardTitle>Funnel health</CardTitle>
+          <CardDescription>
+            Keep these conversion stages moving with daily ops reviews.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
               <span>Qualified from inbound</span>
               <span className="font-semibold">{qualificationRate}%</span>
             </div>
-            <progress className="progress progress-primary w-full" value={qualificationRate} max={100} />
+            <Progress value={qualificationRate} aria-label="Qualified from inbound" />
           </div>
-          <div>
-            <div className="mb-1 flex items-center justify-between text-sm">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
               <span>Contacted from qualified</span>
               <span className="font-semibold">{contactRate}%</span>
             </div>
-            <progress className="progress progress-secondary w-full" value={contactRate} max={100} />
+            <Progress value={contactRate} aria-label="Contacted from qualified" />
           </div>
-          <div>
-            <div className="mb-1 flex items-center justify-between text-sm">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
               <span>Closed from contacted</span>
               <span className="font-semibold">{closeRate}%</span>
             </div>
-            <progress className="progress w-full" value={closeRate} max={100} />
+            <Progress value={closeRate} aria-label="Closed from contacted" />
           </div>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
     </main>
   );
 }

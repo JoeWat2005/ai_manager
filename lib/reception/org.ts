@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getEffectivePlan, isPaidPlan } from "@/lib/billing/effective-plan";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_BUSINESS_HOURS, getDefaultTimezone } from "./defaults";
@@ -8,6 +9,7 @@ type OrganizationWithPlan = {
   name: string;
   slug: string;
   hasPaidPlan: boolean;
+  effectivePlan: string;
 };
 
 function hashString(value: string): number {
@@ -35,13 +37,7 @@ async function generateUniqueExtension(seed: string): Promise<string> {
   throw new Error("Unable to generate unique phone extension");
 }
 
-function getPlanPaidFlag(
-  subscriptionItems: Array<{ plan: string; status: string; periodEnd: Date | null }>
-): boolean {
-  return isPaidPlan(getEffectivePlan(subscriptionItems));
-}
-
-export async function getOrganizationBySlug(
+export const getOrganizationBySlug = cache(async function getOrganizationBySlug(
   slug: string
 ): Promise<OrganizationWithPlan | null> {
   const organization = await prisma.organization.findUnique({
@@ -68,91 +64,104 @@ export async function getOrganizationBySlug(
 
   if (!organization) return null;
 
+  const items = organization.subscription?.items ?? [];
+  const plan = getEffectivePlan(items);
   return {
     id: organization.id,
     clerkOrgId: organization.clerkOrgId,
     name: organization.name,
     slug: organization.slug,
-    hasPaidPlan: getPlanPaidFlag(organization.subscription?.items ?? []),
+    hasPaidPlan: isPaidPlan(plan),
+    effectivePlan: plan,
   };
-}
+});
 
-export async function getOrganizationByPhoneExtension(
-  phoneExtension: string
-): Promise<OrganizationWithPlan | null> {
-  const config = await prisma.receptionistConfig.findUnique({
-    where: { phoneExtension },
-    select: {
-      organization: {
-        select: {
-          id: true,
-          clerkOrgId: true,
-          name: true,
-          slug: true,
-          subscription: {
-            select: {
-              items: {
-                select: {
-                  plan: true,
-                  status: true,
-                  periodEnd: true,
+export const getOrganizationByPhoneExtension = cache(
+  async function getOrganizationByPhoneExtension(
+    phoneExtension: string
+  ): Promise<OrganizationWithPlan | null> {
+    const config = await prisma.receptionistConfig.findUnique({
+      where: { phoneExtension },
+      select: {
+        organization: {
+          select: {
+            id: true,
+            clerkOrgId: true,
+            name: true,
+            slug: true,
+            subscription: {
+              select: {
+                items: {
+                  select: {
+                    plan: true,
+                    status: true,
+                    periodEnd: true,
+                  },
+                  orderBy: [{ periodStart: "asc" }, { id: "asc" }],
                 },
-                orderBy: [{ periodStart: "asc" }, { id: "asc" }],
               },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  if (!config?.organization) return null;
-  const organization = config.organization;
+    if (!config?.organization) return null;
+    const organization = config.organization;
 
-  return {
-    id: organization.id,
-    clerkOrgId: organization.clerkOrgId,
-    name: organization.name,
-    slug: organization.slug,
-    hasPaidPlan: getPlanPaidFlag(organization.subscription?.items ?? []),
-  };
-}
+    const items = organization.subscription?.items ?? [];
+    const plan = getEffectivePlan(items);
+    return {
+      id: organization.id,
+      clerkOrgId: organization.clerkOrgId,
+      name: organization.name,
+      slug: organization.slug,
+      hasPaidPlan: isPaidPlan(plan),
+      effectivePlan: plan,
+    };
+  }
+);
 
-export async function getOrganizationByClerkOrgId(
-  clerkOrgId: string
-): Promise<OrganizationWithPlan | null> {
-  const organization = await prisma.organization.findUnique({
-    where: { clerkOrgId },
-    select: {
-      id: true,
-      clerkOrgId: true,
-      name: true,
-      slug: true,
-      subscription: {
-        select: {
-          items: {
-            select: {
-              plan: true,
-              status: true,
-              periodEnd: true,
+export const getOrganizationByClerkOrgId = cache(
+  async function getOrganizationByClerkOrgId(
+    clerkOrgId: string
+  ): Promise<OrganizationWithPlan | null> {
+    const organization = await prisma.organization.findUnique({
+      where: { clerkOrgId },
+      select: {
+        id: true,
+        clerkOrgId: true,
+        name: true,
+        slug: true,
+        subscription: {
+          select: {
+            items: {
+              select: {
+                plan: true,
+                status: true,
+                periodEnd: true,
+              },
+              orderBy: [{ periodStart: "asc" }, { id: "asc" }],
             },
-            orderBy: [{ periodStart: "asc" }, { id: "asc" }],
           },
         },
       },
-    },
-  });
+    });
 
-  if (!organization) return null;
+    if (!organization) return null;
 
-  return {
-    id: organization.id,
-    clerkOrgId: organization.clerkOrgId,
-    name: organization.name,
-    slug: organization.slug,
-    hasPaidPlan: getPlanPaidFlag(organization.subscription?.items ?? []),
-  };
-}
+    const items = organization.subscription?.items ?? [];
+    const plan = getEffectivePlan(items);
+    return {
+      id: organization.id,
+      clerkOrgId: organization.clerkOrgId,
+      name: organization.name,
+      slug: organization.slug,
+      hasPaidPlan: isPaidPlan(plan),
+      effectivePlan: plan,
+    };
+  }
+);
 
 export async function getOrCreateReceptionistConfig(
   organizationId: string,

@@ -18,6 +18,66 @@ enum ReceptionLeadStatus {
   closed
 }
 
+enum BookingStatus {
+  confirmed
+  completed
+  canceled
+  no_show
+}
+
+enum BookingSource {
+  manual
+  chat
+  phone
+  admin
+}
+
+enum ConversationMessageRole {
+  user
+  assistant
+  system
+}
+
+enum LinkPlatform {
+  custom
+  website
+  linkedin
+  instagram
+  facebook
+  x
+  youtube
+  tiktok
+  whatsapp
+}
+
+enum NotificationEventType {
+  lead_captured
+  booking_confirmed
+  transcript_ready
+  billing_changed
+  booking_canceled
+}
+
+enum NotificationStatus {
+  unread
+  read
+  archived
+}
+
+enum AuditActionType {
+  settings_updated
+  customization_updated
+  link_created
+  link_updated
+  link_deleted
+  booking_created
+  booking_updated
+  lead_status_changed
+  notification_marked
+  organization_updated
+  billing_updated
+}
+
 model User {
   id          String                   @id @default(cuid())
   clerkUserId String                   @unique
@@ -27,51 +87,79 @@ model User {
 }
 
 model Organization {
-  id           String                   @id @default(cuid())
-  clerkOrgId   String                   @unique
-  name         String
-  slug         String                   @unique
+  id                       String                     @id @default(cuid())
+  clerkOrgId               String                     @unique
+  name                     String
+  slug                     String                     @unique
 
-  memberships  OrganizationMembership[]
-  subscription Subscription?
-  receptionistConfig ReceptionistConfig?
-  receptionLeads ReceptionLead[]
-  receptionConversations ReceptionConversation[]
+  memberships              OrganizationMembership[]
+  contacts                 OrganizationContact[]
+  subscription             Subscription?
+  receptionistConfig       ReceptionistConfig?
+  receptionLeads           ReceptionLead[]
+  receptionConversations   ReceptionConversation[]
+  bookingSettings          BookingSettings?
+  bookableStaffProfiles    BookableStaffProfile[]
+  bookings                 Booking[]
+  linkProfile              OrganizationLinkProfile?
+  pageCustomization        OrganizationPageCustomization?
+  notificationEvents       NotificationEvent[]
+  auditLogs                AuditLog[]
+}
+
+model OrganizationContact {
+  id               String          @id @default(cuid())
+  organizationId   String
+  name             String?
+  email            String?
+  phone            String?
+  normalizedPhone  String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  receptionLeads   ReceptionLead[]
+  bookings         Booking[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, normalizedPhone])
+  @@index([organizationId, email])
 }
 
 model OrganizationMembership {
-  id             String       @id @default(cuid())
-  userId         String
-  organizationId String
-  role           String       @default("member")
+  id                 String                 @id @default(cuid())
+  userId             String
+  organizationId     String
+  role               String                 @default("member")
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookableStaffProfile BookableStaffProfile?
 
   @@unique([userId, organizationId])
 }
 
 model Subscription {
-  id                    String             @id @default(cuid())
-  organizationId        String             @unique
-  clerkSubscriptionId   String             @unique
-  status                String             @default("inactive")
+  id                    String               @id @default(cuid())
+  organizationId        String               @unique
+  clerkSubscriptionId   String               @unique
+  status                String               @default("inactive")
 
-  organization          Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   items                 SubscriptionItem[]
 }
 
 model SubscriptionItem {
-  id                    String        @id @default(cuid())
-  subscriptionId        String
+  id                      String         @id @default(cuid())
+  subscriptionId          String
 
-  clerkSubscriptionItemId String      @unique
-  plan                  String
-  status                String
-  periodStart           DateTime?
-  periodEnd             DateTime?
+  clerkSubscriptionItemId String         @unique
+  plan                    String
+  status                  String
+  periodStart             DateTime?
+  periodEnd               DateTime?
 
-  subscription          Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription            Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
 }
@@ -96,9 +184,8 @@ model ReceptionistConfig {
 model ReceptionLead {
   id                      String              @id @default(cuid())
   organizationId          String
+  contactId               String?
   channel                 ReceptionChannel
-  name                    String?
-  phone                   String?
   intent                  String?
   preferredCallbackWindow String?
   callbackReason          String?
@@ -111,14 +198,17 @@ model ReceptionLead {
   updatedAt               DateTime            @updatedAt
 
   organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact                 OrganizationContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversations           ReceptionConversation[]
 
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
 }
 
 model ReceptionConversation {
-  id                     String           @id @default(cuid())
+  id                     String                        @id @default(cuid())
   organizationId         String
+  leadId                 String?
   channel                ReceptionChannel
   provider               String
   providerConversationId String
@@ -126,11 +216,207 @@ model ReceptionConversation {
   startedAt              DateTime?
   endedAt                DateTime?
   metadataJson           Json?
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
 
-  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization           Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead                   ReceptionLead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  messages               ReceptionConversationMessage[]
+  callRecording          ReceptionCallRecording?
+  bookings               Booking[]
 
   @@index([organizationId, createdAt])
   @@unique([provider, providerConversationId])
 }
+
+model ReceptionConversationMessage {
+  id              String                  @id @default(cuid())
+  conversationId  String
+  role            ConversationMessageRole
+  content         String
+  metadataJson    Json?
+  createdAt       DateTime                @default(now())
+
+  conversation    ReceptionConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model ReceptionCallRecording {
+  id                 String                @id @default(cuid())
+  conversationId     String                @unique
+  recordingUrl       String?
+  storageProvider    String?
+  durationSeconds    Int?
+  transcriptText     String?
+  transcriptSummary  String?
+  metadataJson       Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  conversation       ReceptionConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model BookingSettings {
+  id                  String       @id @default(cuid())
+  organizationId      String       @unique
+  timezone            String       @default("Europe/London")
+  slotLengthMinutes   Int          @default(30)
+  openingHoursJson    Json
+  instantConfirm      Boolean      @default(true)
+  autoAssign          Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model BookableStaffProfile {
+  id                 String                    @id @default(cuid())
+  organizationId     String
+  membershipId       String?                   @unique
+  displayName        String
+  email              String?
+  timezone           String                    @default("Europe/London")
+  bookable           Boolean                   @default(true)
+  priority           Int                       @default(0)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  organization       Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership         OrganizationMembership?   @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  availabilities     BookableStaffAvailability[]
+  bookings           Booking[]
+
+  @@index([organizationId, bookable])
+}
+
+model BookableStaffAvailability {
+  id               String               @id @default(cuid())
+  staffProfileId   String
+  weekday          Int
+  startMinutes     Int
+  endMinutes       Int
+  isEnabled        Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  staffProfile     BookableStaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@index([staffProfileId, weekday])
+}
+
+model Booking {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  contactId          String
+  staffProfileId     String?
+  conversationId     String?
+  source             BookingSource    @default(manual)
+  status             BookingStatus    @default(confirmed)
+  service            String?
+  notes              String?
+  preferredStaffName String?
+  startAt            DateTime
+  endAt              DateTime
+  timezone           String           @default("Europe/London")
+  metadataJson       Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contact            OrganizationContact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  staffProfile       BookableStaffProfile? @relation(fields: [staffProfileId], references: [id], onDelete: SetNull)
+  conversation       ReceptionConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startAt])
+  @@index([organizationId, status])
+  @@index([staffProfileId, startAt])
+}
+
+model OrganizationLinkProfile {
+  id             String               @id @default(cuid())
+  organizationId String               @unique
+  title          String
+  bio            String?
+  avatarUrl      String?
+  accentColor    String               @default("#2563eb")
+  buttonStyle    String               @default("solid")
+  showBranding   Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items          OrganizationLinkItem[]
+}
+
+model OrganizationLinkItem {
+  id             String                  @id @default(cuid())
+  profileId      String
+  platform       LinkPlatform            @default(custom)
+  label          String
+  url            String
+  sortOrder      Int                     @default(0)
+  visible        Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  profile        OrganizationLinkProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, sortOrder])
+}
+
+model OrganizationPageCustomization {
+  id                      String       @id @default(cuid())
+  organizationId          String       @unique
+  landingHeroTitle        String       @default("AI receptionist support for your business")
+  landingHeroSubtitle     String       @default("Capture leads, qualify intent, and book callbacks in one flow.")
+  landingPrimaryCtaLabel  String       @default("Book now")
+  landingSecondaryCtaLabel String      @default("Start AI chat")
+  landingShowBookingForm  Boolean      @default(true)
+  landingShowChatWidget   Boolean      @default(true)
+  landingAccentColor      String       @default("#2563eb")
+  linksTitle              String       @default("Find us online")
+  linksBio                String?
+  linksAccentColor        String       @default("#2563eb")
+  linksButtonStyle        String       @default("solid")
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model NotificationEvent {
+  id             String                @id @default(cuid())
+  organizationId String
+  type           NotificationEventType
+  title          String
+  body           String
+  status         NotificationStatus    @default(unread)
+  metadataJson   Json?
+  readAt         DateTime?
+  createdAt      DateTime              @default(now())
+
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+}
+
+model AuditLog {
+  id             String         @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         AuditActionType
+  targetType     String?
+  targetId       String?
+  description    String
+  metadataJson   Json?
+  createdAt      DateTime       @default(now())
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action])
+}
+
