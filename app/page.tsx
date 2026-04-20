@@ -99,19 +99,17 @@ export default async function HomePage() {
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/deskcaptain.png"
-              alt="Deskcaptain logo"
-              width={40}
-              height={40}
-              className="rounded-xl"
-              priority
-            />
-            <div>
-              <p className="text-sm font-bold tracking-tight text-foreground">Deskcaptain</p>
-              <p className="text-xs text-muted-foreground">AI receptionist for SMBs</p>
-            </div>
+          <div className="flex items-center">
+            <Link href="/">
+              <Image
+                src="/deskcaptain.png"
+                alt="Deskcaptain logo"
+                width={150}
+                height={150}
+                className="rounded-xl cursor-pointer"
+                priority
+              />
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <Link href="/sign-in" className={buttonVariants({ variant: "ghost", size: "sm" })}>
@@ -296,8 +294,7 @@ export default async function HomePage() {
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <div className="flex items-center gap-2">
-              <Image src="/deskcaptain.png" alt="" width={28} height={28} className="rounded-lg opacity-80" />
-              <span className="text-sm font-semibold text-muted-foreground">Deskcaptain</span>
+              <Image src="/deskcaptain.png" alt="" width={150} height={150} className="rounded-lg opacity-80" />
             </div>
             <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Deskcaptain. All rights reserved.</p>
           </div>

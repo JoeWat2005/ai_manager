@@ -47,9 +47,6 @@ export default async function DashboardLayout({
                   </svg>
                 </label>
                 <div>
-                  <p className="text-[10px] font-semibold tracking-[0.2em] text-primary uppercase">
-                    Deskcaptain
-                  </p>
                   <p className="text-sm font-semibold text-foreground">{slug}</p>
                 </div>
               </div>
@@ -73,20 +70,17 @@ export default async function DashboardLayout({
           />
           <aside className="flex min-h-full w-72 flex-col border-r border-border bg-background">
             {/* Logo */}
-            <div className="flex items-center gap-3 px-5 py-4">
+            <div className="flex flex-col items-start gap-2 px-5 py-4">
               <Image
                 src="/deskcaptain.png"
                 alt="Deskcaptain"
-                width={36}
-                height={36}
+                width={128}
+                height={128}
                 className="rounded-xl"
               />
-              <div>
-                <p className="text-[10px] font-semibold tracking-[0.2em] text-primary uppercase">
-                  Workspace
-                </p>
-                <p className="text-sm font-bold text-foreground">Deskcaptain</p>
-              </div>
+              <p className="text-sm font-bold tracking-[0.28em] text-foreground uppercase">
+                Workspace
+              </p>
             </div>
 
             <Separator />

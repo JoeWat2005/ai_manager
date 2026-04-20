@@ -6,7 +6,7 @@ import { clerkAppearance } from "@/lib/clerk/appearance";
 export default function Page() {
   return (
     <AuthShell
-      title="Create your Deskcaptain account"
+      title="Create your account"
       description="Set up your workspace and start capturing inbound leads faster."
     >
       <SignUp appearance={clerkAppearance} />
