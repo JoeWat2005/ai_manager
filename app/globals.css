@@ -102,134 +102,77 @@ html[data-a11y-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
+/* ── Layout utilities ─────────────────────────────────────────────────────── */
 .app-shell {
   @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
 }
 
 .app-card {
-  @apply card border border-base-300 bg-base-100 shadow-sm;
+  @apply rounded-2xl border border-border bg-card shadow-sm;
 }
 
 .app-title {
-  @apply text-3xl font-bold tracking-tight text-base-content;
+  @apply text-3xl font-bold tracking-tight text-foreground;
 }
 
 .app-subtitle {
-  @apply text-sm text-base-content/70;
+  @apply text-sm text-muted-foreground;
 }
 
-.landing-fade-up {
-  animation: landing-fade-up 680ms ease-out both;
+/* ── Landing page dark hero ───────────────────────────────────────────────── */
+.hero-grid-bg {
+  background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
 }
 
-.landing-fade-up-delay {
-  animation: landing-fade-up 680ms ease-out 90ms both;
-}
-
-.landing-fade-up-delay-2 {
-  animation: landing-fade-up 680ms ease-out 180ms both;
-}
-
-.landing-orb {
-  animation: landing-float 9s ease-in-out infinite;
-}
-
+/* ── Marquee ──────────────────────────────────────────────────────────────── */
 .brand-marquee-track {
   animation: brand-marquee 26s linear infinite;
 }
 
-.landing-demo-panel {
-  animation: landing-fade-up 320ms ease-out both;
-}
-
-.desk-grid-ambient {
-  background-image: linear-gradient(
-      to right,
-      color-mix(in oklab, #94a3b8 20%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in oklab, #94a3b8 20%, transparent) 1px,
-      transparent 1px
-    );
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at 50% 20%, black 20%, transparent 78%);
-  opacity: 0.45;
-}
-
-.desk-rise {
-  animation: desk-rise 720ms ease-out both;
-}
-
-.desk-rise-delay {
-  animation: desk-rise 720ms ease-out 120ms both;
-}
-
-.desk-rise-card {
-  animation: desk-rise 720ms ease-out both;
-}
-
 @media (max-width: 767px) {
-  .brand-marquee-track {
-    animation: none;
-  }
+  .brand-marquee-track { animation: none; }
 }
 
+/* ── Reduced-motion overrides ─────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+  html { scroll-behavior: auto; }
+  .brand-marquee-track { animation: none; }
+}
 
-  .landing-fade-up,
-  .landing-fade-up-delay,
-  .landing-fade-up-delay-2,
-  .landing-orb,
-  .brand-marquee-track,
-  .landing-demo-panel,
-  .desk-rise,
-  .desk-rise-delay,
-  .desk-rise-card {
-    animation: none;
-  }
+html[data-a11y-motion="reduce"] {
+  scroll-behavior: auto !important;
+}
+html[data-a11y-motion="reduce"] *,
+html[data-a11y-motion="reduce"] *::before,
+html[data-a11y-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 @keyframes brand-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
-@keyframes landing-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ── Dashboard animations ─────────────────────────────────────────────────── */
+.desk-rise {
+  animation: desk-rise 600ms cubic-bezier(0.22,1,0.36,1) both;
 }
-
-@keyframes landing-float {
-  0% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-16px) scale(1.02);
-  }
-  100% {
-    transform: translateY(0) scale(1);
-  }
+.desk-rise-delay {
+  animation: desk-rise 600ms cubic-bezier(0.22,1,0.36,1) 80ms both;
+}
+.desk-rise-card {
+  animation: desk-rise 600ms cubic-bezier(0.22,1,0.36,1) both;
 }
 
 @keyframes desk-rise {
   from {
     opacity: 0;
-    transform: translateY(22px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;

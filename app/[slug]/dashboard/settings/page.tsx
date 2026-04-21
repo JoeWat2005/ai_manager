@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PricingTable } from "@clerk/nextjs";
+import { ArrowRightIcon } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
@@ -152,10 +152,16 @@ export default async function SettingsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PricingTable
-              for="organization"
-              newSubscriptionRedirectUrl={`/${organization.slug}/dashboard/settings`}
-            />
+            <p className="text-sm text-muted-foreground mb-4">
+              Upgrade to Pro to configure the AI phone receptionist, chat widget, and notification routing.
+            </p>
+            <Link
+              href={`/${organization.slug}/dashboard/billing`}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline underline-offset-4"
+            >
+              View plans and upgrade
+              <ArrowRightIcon className="size-3.5" />
+            </Link>
           </CardContent>
         </Card>
       )}

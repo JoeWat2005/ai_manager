@@ -1,18 +1,26 @@
 import dynamic from "next/dynamic";
+import { ClockIcon, PhoneIcon, ZapIcon, ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicBookingForm } from "@/components/reception/PublicBookingForm";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { getOrCreateLinkProfile, getOrCreatePageCustomization } from "@/lib/dashboard/org-resources";
 import { getOrCreateReceptionistConfig, getOrganizationBySlug } from "@/lib/reception/org";
+import { cn } from "@/lib/utils";
 
 const WebChatWidget = dynamic(
   () => import("@/components/reception/WebChatWidget").then((mod) => mod.WebChatWidget),
   {
     loading: () => (
-      <section className="rounded-2xl border border-slate-200 bg-base-100 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Loading AI booking assistant...</h2>
-        <p className="mt-2 text-sm text-slate-600">Preparing chat context and receptionist settings.</p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Loading AI booking assistant…</CardTitle>
+          <CardDescription>Preparing chat context and receptionist settings.</CardDescription>
+        </CardHeader>
+      </Card>
     ),
   }
 );
@@ -24,10 +32,7 @@ export default async function OrgLandingPage({
 }) {
   const { slug } = await params;
   const organization = await getOrganizationBySlug(slug);
-
-  if (!organization) {
-    notFound();
-  }
+  if (!organization) notFound();
 
   const [customization, linksProfile] = await Promise.all([
     getOrCreatePageCustomization(organization.id, organization.name),
@@ -50,107 +55,155 @@ export default async function OrgLandingPage({
     timezone = config.timezone;
   }
 
+  const hasLinks = linksProfile.items.filter((i) => i.visible).length > 0;
+
   return (
-    <main className="min-h-screen bg-base-200/40 pb-12 pt-6">
-      <div className="app-shell space-y-6">
-        <header className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.17em] text-primary uppercase">
-                {organization.name}
-              </p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">
-                {customization.landingHeroTitle}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                {customization.landingHeroSubtitle}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Link href={`/${slug}/links`} className="btn btn-outline btn-sm">
-                View links page
-              </Link>
-              <Link href={`/${slug}/dashboard`} className="btn btn-ghost btn-sm">
-                Business dashboard
-              </Link>
-            </div>
+    <main className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-30">
+        <div className="app-shell flex items-center justify-between py-3 gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+              {organization.name}
+            </p>
           </div>
-        </header>
+          <div className="flex items-center gap-2">
+            {hasLinks && (
+              <Link
+                href={`/${slug}/links`}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs")}
+              >
+                Links page
+              </Link>
+            )}
+            <Link
+              href={`/${slug}/dashboard`}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-xs")}
+            >
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      </header>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <article className="app-card">
-            <div className="card-body py-4">
-              <p className="text-xs uppercase tracking-wide text-base-content/60">Coverage</p>
-              <p className="text-2xl font-black">24/7 inbound</p>
-              <p className="text-xs text-base-content/70">Timezone defaults: {timezone}</p>
-            </div>
-          </article>
-          <article className="app-card">
-            <div className="card-body py-4">
-              <p className="text-xs uppercase tracking-wide text-base-content/60">Phone extension</p>
-              <p className="text-2xl font-black">{phoneEnabled && phoneExtension ? phoneExtension : "Not enabled"}</p>
-              <p className="text-xs text-base-content/70">Shared UK number with org extension routing</p>
-            </div>
-          </article>
-          <article className="app-card">
-            <div className="card-body py-4">
-              <p className="text-xs uppercase tracking-wide text-base-content/60">AI concierge</p>
-              <p className="text-2xl font-black">{chatEnabled ? "Online" : "Offline"}</p>
-              <p className="text-xs text-base-content/70">Lead qualification + callback capture</p>
-            </div>
-          </article>
-        </section>
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b border-border bg-card">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/8 blur-3xl" />
+        <div className="app-shell py-10 sm:py-14">
+          <Badge variant="outline" className="mb-4 text-primary">Live workspace</Badge>
+          <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+            {customization.landingHeroTitle}
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {customization.landingHeroSubtitle}
+          </p>
+        </div>
+      </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-6">
+      {/* Info cards */}
+      <section className="app-shell py-6">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted/50">
+                <ClockIcon className="size-4 text-primary" />
+              </div>
+              <CardDescription className="text-xs mt-2">Coverage</CardDescription>
+              <CardTitle className="text-base font-black">24/7 inbound</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Timezone: {timezone}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted/50">
+                <PhoneIcon className="size-4 text-primary" />
+              </div>
+              <CardDescription className="text-xs mt-2">Phone extension</CardDescription>
+              <CardTitle className="text-base font-black">
+                {phoneEnabled && phoneExtension ? phoneExtension : "Not enabled"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Shared UK number with extension routing</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted/50">
+                <ZapIcon className="size-4 text-primary" />
+              </div>
+              <CardDescription className="text-xs mt-2">AI concierge</CardDescription>
+              <CardTitle className="text-base font-black">
+                {chatEnabled ? "Online" : "Offline"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Lead qualification + callback capture</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Main content */}
+      <section className="app-shell pb-12">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5">
             {customization.landingShowBookingForm && (
               <PublicBookingForm slug={slug} ctaLabel={customization.landingPrimaryCtaLabel} />
             )}
 
-            <article className="app-card">
-              <div className="card-body">
-                <h2 className="card-title">Need something else?</h2>
-                <p className="text-sm text-base-content/70">
-                  You can still call us and request a callback anytime. Calls may be recorded and
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Need something else?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  You can call us and request a callback anytime. Calls may be recorded and
                   handled by AI for service quality.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="badge badge-outline">Recording disclosure enabled</span>
-                  <span className="badge badge-outline">Callback consent capture</span>
-                  {linksProfile.items.filter((item) => item.visible).length > 0 && (
-                    <Link href={`/${slug}/links`} className="badge badge-primary badge-outline">
-                      Social links available
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-xs">Recording disclosure enabled</Badge>
+                  <Badge variant="outline" className="text-xs">Callback consent capture</Badge>
+                  {hasLinks && (
+                    <Link href={`/${slug}/links`}>
+                      <Badge variant="secondary" className="text-xs cursor-pointer hover:bg-secondary/80">
+                        View our links
+                        <ArrowRightIcon className="ml-1 size-3" />
+                      </Badge>
                     </Link>
                   )}
                 </div>
-              </div>
-            </article>
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="xl:sticky xl:top-6 xl:self-start">
+          <div className="xl:sticky xl:top-20 xl:self-start">
             {customization.landingShowChatWidget && chatEnabled ? (
               <WebChatWidget slug={slug} />
             ) : (
-              <article className="app-card">
-                <div className="card-body">
-                  <h2 className="card-title">AI chat currently unavailable</h2>
-                  <p className="text-sm text-base-content/70">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">AI chat unavailable</CardTitle>
+                  <CardDescription>
                     Chat assistant is currently disabled. Please use the booking form or phone flow.
-                  </p>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   <button
                     type="button"
-                    className="btn btn-outline"
-                    style={{ borderColor: customization.landingAccentColor, color: customization.landingAccentColor }}
+                    className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    style={{ borderColor: customization.landingAccentColor }}
                   >
                     {customization.landingSecondaryCtaLabel}
                   </button>
-                </div>
-              </article>
+                </CardContent>
+              </Card>
             )}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }
-

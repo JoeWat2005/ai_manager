@@ -12,13 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -204,87 +197,6 @@ export function CustomizationForm({ initialCustomization }: Props) {
 
             <Button type="submit" disabled={saving} className="self-start">
               {saving ? "Saving..." : "Save landing customization"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Links page customization</CardTitle>
-          <CardDescription>
-            Fine-tune your public links profile copy, styling, and button treatment.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-5" onSubmit={saveCustomization}>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="links-title">Links title</Label>
-                <Input
-                  id="links-title"
-                  value={customization.linksTitle}
-                  onChange={(event) =>
-                    setCustomization((current) => ({
-                      ...current,
-                      linksTitle: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="links-button-style">Links button style</Label>
-                <Select
-                  value={customization.linksButtonStyle}
-                  onValueChange={(value) =>
-                    setCustomization((current) => ({
-                      ...current,
-                      linksButtonStyle: value ?? current.linksButtonStyle,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="links-button-style" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="solid">Solid</SelectItem>
-                    <SelectItem value="outline">Outline</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5 xl:col-span-2">
-                <Label htmlFor="links-bio">Links bio</Label>
-                <Textarea
-                  id="links-bio"
-                  value={customization.linksBio ?? ""}
-                  onChange={(event) =>
-                    setCustomization((current) => ({
-                      ...current,
-                      linksBio: event.target.value,
-                    }))
-                  }
-                  className="min-h-28"
-                />
-              </div>
-            </div>
-
-            <AccentColorSelector
-              label="Links accent color"
-              description="Applies to the header accent and button treatment on your public links page."
-              value={customization.linksAccentColor}
-              onValueChange={(value) =>
-                setCustomization((current) => ({
-                  ...current,
-                  linksAccentColor: value,
-                }))
-              }
-              disabled={saving}
-            />
-
-            <Button type="submit" variant="outline" disabled={saving} className="self-start">
-              {saving ? "Saving..." : "Save links customization"}
             </Button>
           </form>
         </CardContent>

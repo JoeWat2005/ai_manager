@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PricingTable } from "@clerk/nextjs";
 import { LeadsQueueBoard } from "@/components/dashboard/LeadsQueueBoard";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 import { prisma } from "@/lib/prisma";
@@ -33,10 +32,15 @@ export default async function LeadsPage({
             <CardTitle>Upgrade to access leads</CardTitle>
           </CardHeader>
           <CardContent>
-            <PricingTable
-              for="organization"
-              newSubscriptionRedirectUrl={`/${organization.slug}/dashboard/leads`}
-            />
+            <p className="text-sm text-muted-foreground mb-4">
+              Upgrade to Pro to capture and manage AI receptionist leads in one place.
+            </p>
+            <Link
+              href={`/${organization.slug}/dashboard/billing`}
+              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+            >
+              View plans and upgrade
+            </Link>
           </CardContent>
         </Card>
       </main>

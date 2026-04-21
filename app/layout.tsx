@@ -6,6 +6,7 @@ import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { getAccessibilityBootScript } from "@/lib/accessibility/preferences";
 import { clerkAppearance } from "@/lib/clerk/appearance";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -50,8 +51,10 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: getAccessibilityBootScript() }}
           />
         </head>
-        <body className="min-h-full bg-base-100 text-base-content">
-          {children}
+        <body className="min-h-full bg-background text-foreground">
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
           <Toaster position="bottom-right" richColors />
           <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
         </body>

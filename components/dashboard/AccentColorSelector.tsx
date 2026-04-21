@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useId, useMemo, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,10 @@ function normalizeColor(value: string) {
   return value.trim().toLowerCase();
 }
 
+function isValidHex(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
 export function AccentColorSelector({
   label,
   description,
@@ -41,7 +45,12 @@ export function AccentColorSelector({
   disabled = false,
 }: Props) {
   const reactId = useId();
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const normalizedValue = normalizeColor(value);
+
+  const isPreset = DEFAULT_ACCENT_OPTIONS.some(
+    (o) => normalizeColor(o.value) === normalizedValue
+  );
 
   const options = useMemo(() => {
     const normalizedDefaults = DEFAULT_ACCENT_OPTIONS.map((option) => ({
@@ -54,11 +63,7 @@ export function AccentColorSelector({
     }
 
     return [
-      {
-        label: "Current",
-        value,
-        normalizedValue,
-      },
+      { label: "Current", value, normalizedValue },
       ...normalizedDefaults,
     ];
   }, [normalizedValue, value]);
@@ -123,6 +128,62 @@ export function AccentColorSelector({
           );
         })}
       </RadioGroup>
+
+      {/* Custom colour wheel picker */}
+      <div
+        className={cn(
+          "flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors",
+          !isPreset ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-background"
+        )}
+      >
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => colorInputRef.current?.click()}
+            className={cn(
+              "size-8 rounded-full border-2 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              disabled
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer hover:scale-110",
+              !isPreset ? "border-primary" : "border-border/60"
+            )}
+            style={{ backgroundColor: value }}
+            aria-label="Open colour wheel"
+          />
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={isValidHex(value) ? value : "#2563eb"}
+            onChange={(e) => onValueChange(e.target.value)}
+            disabled={disabled}
+            className="pointer-events-none absolute inset-0 size-0 opacity-0"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Custom colour</p>
+          <p className="truncate text-xs text-muted-foreground font-mono">
+            {!isPreset ? `${value.toUpperCase()} — active` : "Click to pick any colour"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => colorInputRef.current?.click()}
+          className={cn(
+            "shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+            disabled
+              ? "cursor-not-allowed border-border bg-background text-muted-foreground opacity-60"
+              : "cursor-pointer border-border bg-background text-foreground hover:bg-muted"
+          )}
+        >
+          Pick colour
+        </button>
+      </div>
     </div>
   );
 }
