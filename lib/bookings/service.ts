@@ -4,6 +4,9 @@ import { normalizeBusinessHours } from "@/lib/reception/business-hours";
 import { createAuditLog, createNotificationEvent } from "@/lib/dashboard/events";
 import { upsertOrganizationContact } from "@/lib/contacts/service";
 
+// --- TYPES ---
+
+// Days of the week used for scheduling
 type WeekdayName =
   | "sunday"
   | "monday"
@@ -13,6 +16,7 @@ type WeekdayName =
   | "friday"
   | "saturday";
 
+// Represents a staff member who can be booked
 type StaffProfile = {
   id: string;
   displayName: string;
@@ -20,21 +24,24 @@ type StaffProfile = {
   timezone: string;
   bookable: boolean;
   priority: number;
+
+  // Weekly availability windows
   availabilities: Array<{
-    weekday: number;
-    startMinutes: number;
+    weekday: number;        // 0 = Sunday ... 6 = Saturday
+    startMinutes: number;   // minutes since midnight
     endMinutes: number;
     isEnabled: boolean;
   }>;
 };
 
-
+// Represents an existing booking used for conflict checking
 type BookingConflict = {
   staffProfileId: string | null;
   startAt: Date;
   endAt: Date;
 };
 
+// Input for finding available slots
 type FindSlotsInput = {
   organizationId: string;
   preferredStaffId?: string | null;
@@ -43,6 +50,7 @@ type FindSlotsInput = {
   limit: number;
 };
 
+// A valid available time slot result
 export type AvailableSlot = {
   startAt: Date;
   endAt: Date;
@@ -50,6 +58,7 @@ export type AvailableSlot = {
   staffDisplayName: string;
 };
 
+// Input for creating a booking
 export type CreateBookingInput = {
   organizationId: string;
   actorUserId?: string | null;
@@ -66,6 +75,9 @@ export type CreateBookingInput = {
   metadataJson?: unknown;
 };
 
+// --- WEEKDAY HELPERS ---
+
+// Maps short weekday labels to full names
 const WEEKDAY_LABEL_TO_NAME: Record<string, WeekdayName> = {
   Sun: "sunday",
   Mon: "monday",
@@ -76,6 +88,7 @@ const WEEKDAY_LABEL_TO_NAME: Record<string, WeekdayName> = {
   Sat: "saturday",
 };
 
+// Maps weekday names to numeric index
 const WEEKDAY_NAME_TO_INDEX: Record<WeekdayName, number> = {
   sunday: 0,
   monday: 1,
@@ -86,11 +99,13 @@ const WEEKDAY_NAME_TO_INDEX: Record<WeekdayName, number> = {
   saturday: 6,
 };
 
+// Convert "HH:MM" → minutes since midnight
 function parseTimeToMinutes(value: string): number {
   const [hourRaw, minuteRaw] = value.split(":");
   const hour = Number(hourRaw);
   const minute = Number(minuteRaw);
 
+  // Validate input
   if (
     Number.isNaN(hour) ||
     Number.isNaN(minute) ||
@@ -105,16 +120,14 @@ function parseTimeToMinutes(value: string): number {
   return hour * 60 + minute;
 }
 
+// Round a date up to the nearest interval (e.g. 30 min)
 function roundUpToInterval(date: Date, minutes: number): Date {
   const ms = minutes * 60_000;
   return new Date(Math.ceil(date.getTime() / ms) * ms);
 }
 
-function getLocalWeekdayAndMinutes(date: Date, timezone: string): {
-  weekdayName: WeekdayName;
-  weekdayIndex: number;
-  minutes: number;
-} {
+// Get weekday + minutes in a specific timezone
+function getLocalWeekdayAndMinutes(date: Date, timezone: string) {
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
     weekday: "short",
@@ -124,9 +137,10 @@ function getLocalWeekdayAndMinutes(date: Date, timezone: string): {
   });
 
   const parts = formatter.formatToParts(date);
-  const weekdayLabel = parts.find((part) => part.type === "weekday")?.value ?? "Sun";
-  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  const weekdayLabel = parts.find((p) => p.type === "weekday")?.value ?? "Sun";
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+
   const weekdayName = WEEKDAY_LABEL_TO_NAME[weekdayLabel] ?? "sunday";
 
   return {
@@ -136,6 +150,9 @@ function getLocalWeekdayAndMinutes(date: Date, timezone: string): {
   };
 }
 
+// --- VALIDATION HELPERS ---
+
+// Check if slot is inside organization opening hours
 function isSlotInsideOrganizationHours(
   startAt: Date,
   slotLengthMinutes: number,
@@ -145,9 +162,7 @@ function isSlotInsideOrganizationHours(
   const start = getLocalWeekdayAndMinutes(startAt, timezone);
   const dayConfig = openingHours[start.weekdayName];
 
-  if (!dayConfig?.enabled) {
-    return false;
-  }
+  if (!dayConfig?.enabled) return false;
 
   const dayStart = parseTimeToMinutes(dayConfig.start);
   const dayEnd = parseTimeToMinutes(dayConfig.end);
@@ -156,6 +171,7 @@ function isSlotInsideOrganizationHours(
   return start.minutes >= dayStart && slotEndMinutes <= dayEnd;
 }
 
+// Check if slot fits staff availability
 function isSlotInsideStaffAvailability(
   staff: StaffProfile,
   startAt: Date,
@@ -166,45 +182,44 @@ function isSlotInsideStaffAvailability(
   const slotEndMinutes = local.minutes + slotLengthMinutes;
 
   const windows = staff.availabilities.filter(
-    (item) => item.isEnabled && item.weekday === local.weekdayIndex
+    (a) => a.isEnabled && a.weekday === local.weekdayIndex
   );
 
-  if (windows.length === 0) {
-    return false;
-  }
+  if (windows.length === 0) return false;
 
   return windows.some(
-    (window) => local.minutes >= window.startMinutes && slotEndMinutes <= window.endMinutes
+    (w) => local.minutes >= w.startMinutes && slotEndMinutes <= w.endMinutes
   );
 }
 
+// Check if slot overlaps an existing booking
 function hasConflict(
   conflicts: BookingConflict[],
   staffProfileId: string,
   startAt: Date,
   endAt: Date
 ): boolean {
-  return conflicts.some((booking) => {
-    if (booking.staffProfileId !== staffProfileId) {
-      return false;
-    }
-
-    return startAt < booking.endAt && endAt > booking.startAt;
+  return conflicts.some((b) => {
+    if (b.staffProfileId !== staffProfileId) return false;
+    return startAt < b.endAt && endAt > b.startAt;
   });
 }
 
+// Create a readable name from email
 function buildDisplayNameFromEmail(email: string): string {
   const local = email.split("@")[0] ?? "staff";
   return local
     .replace(/[._-]+/g, " ")
     .split(" ")
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ");
 }
 
+// Create default availability for new staff
 async function createDefaultAvailabilities(staffProfileId: string) {
   const base = normalizeBusinessHours(DEFAULT_BUSINESS_HOURS);
+
   const rows = Object.entries(base).map(([weekdayName, schedule]) => ({
     staffProfileId,
     weekday: WEEKDAY_NAME_TO_INDEX[weekdayName as WeekdayName],
@@ -213,19 +228,16 @@ async function createDefaultAvailabilities(staffProfileId: string) {
     isEnabled: schedule.enabled,
   }));
 
-  await prisma.bookableStaffAvailability.createMany({
-    data: rows,
-  });
+  await prisma.bookableStaffAvailability.createMany({ data: rows });
 }
 
+// Ensure booking settings exist
 export async function getOrCreateBookingSettings(organizationId: string) {
   const existing = await prisma.bookingSettings.findUnique({
     where: { organizationId },
   });
 
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
 
   return prisma.bookingSettings.create({
     data: {
@@ -239,38 +251,26 @@ export async function getOrCreateBookingSettings(organizationId: string) {
   });
 }
 
+// Sync staff profiles with organization members
 export async function syncBookableStaffProfiles(organizationId: string) {
   const [memberships, existingProfiles] = await Promise.all([
     prisma.organizationMembership.findMany({
       where: { organizationId },
-      select: {
-        id: true,
-        user: {
-          select: {
-            email: true,
-          },
-        },
-      },
+      select: { id: true, user: { select: { email: true } } },
     }),
     prisma.bookableStaffProfile.findMany({
       where: { organizationId },
-      select: {
-        id: true,
-        membershipId: true,
-      },
+      select: { id: true, membershipId: true },
     }),
   ]);
 
   const existingMembershipIds = new Set(
-    existingProfiles
-      .map((profile) => profile.membershipId)
-      .filter((value): value is string => typeof value === "string")
+    existingProfiles.map((p) => p.membershipId).filter(Boolean)
   );
 
+  // Create missing staff profiles
   for (const membership of memberships) {
-    if (existingMembershipIds.has(membership.id)) {
-      continue;
-    }
+    if (existingMembershipIds.has(membership.id)) continue;
 
     const profile = await prisma.bookableStaffProfile.create({
       data: {
@@ -289,30 +289,23 @@ export async function syncBookableStaffProfiles(organizationId: string) {
 
   return prisma.bookableStaffProfile.findMany({
     where: { organizationId },
-    include: {
-      availabilities: true,
-    },
+    include: { availabilities: true },
     orderBy: [{ priority: "asc" }, { displayName: "asc" }],
   });
 }
 
+// Fetch existing bookings to detect conflicts
 async function getBookingConflicts(
   organizationId: string,
   windowStart: Date,
   windowEnd: Date
 ): Promise<BookingConflict[]> {
-  const bookings = await prisma.booking.findMany({
+  return prisma.booking.findMany({
     where: {
       organizationId,
-      status: {
-        in: ["confirmed", "completed"],
-      },
-      startAt: {
-        lt: windowEnd,
-      },
-      endAt: {
-        gt: windowStart,
-      },
+      status: { in: ["confirmed", "completed"] },
+      startAt: { lt: windowEnd },
+      endAt: { gt: windowStart },
     },
     select: {
       staffProfileId: true,
@@ -320,9 +313,9 @@ async function getBookingConflicts(
       endAt: true,
     },
   });
-
-  return bookings;
 }
+
+// --- SLOT FINDING ENGINE (CORE LOGIC) ---
 
 async function findAvailableSlotsInternal(
   input: FindSlotsInput
@@ -333,33 +326,40 @@ async function findAvailableSlotsInternal(
   const openingHours = normalizeBusinessHours(settings.openingHoursJson);
 
   const staffProfiles = await syncBookableStaffProfiles(input.organizationId);
-  const bookableStaff = staffProfiles.filter((staff) => staff.bookable);
+  const bookableStaff = staffProfiles.filter((s) => s.bookable);
 
-  if (bookableStaff.length === 0) {
-    return [];
-  }
+  if (bookableStaff.length === 0) return [];
 
+  // Prioritize preferred staff
   const preferredStaff =
     input.preferredStaffId != null
-      ? bookableStaff.find((staff) => staff.id === input.preferredStaffId) ?? null
+      ? bookableStaff.find((s) => s.id === input.preferredStaffId) ?? null
       : null;
 
   const orderedStaff = preferredStaff
-    ? [preferredStaff, ...bookableStaff.filter((staff) => staff.id !== preferredStaff.id)]
+    ? [preferredStaff, ...bookableStaff.filter((s) => s.id !== preferredStaff.id)]
     : bookableStaff;
 
+  // Define search window (next 14 days)
   const searchStart = roundUpToInterval(
     input.startFrom && input.startFrom.getTime() > Date.now()
       ? input.startFrom
       : new Date(),
     slotLengthMinutes
   );
+
   const searchEnd = new Date(searchStart.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const conflicts = await getBookingConflicts(input.organizationId, searchStart, searchEnd);
+
+  const conflicts = await getBookingConflicts(
+    input.organizationId,
+    searchStart,
+    searchEnd
+  );
 
   const slots: AvailableSlot[] = [];
   const stepMs = slotLengthMinutes * 60_000;
 
+  // Iterate through time slots
   for (
     let cursor = searchStart.getTime();
     cursor <= searchEnd.getTime() && slots.length < input.limit;
@@ -376,13 +376,10 @@ async function findAvailableSlotsInternal(
       if (!isSlotInsideStaffAvailability(staff, startAt, slotLengthMinutes, timezone)) {
         return false;
       }
-
       return !hasConflict(conflicts, staff.id, startAt, endAt);
     });
 
-    if (!availableStaff) {
-      continue;
-    }
+    if (!availableStaff) continue;
 
     slots.push({
       startAt,
@@ -395,14 +392,18 @@ async function findAvailableSlotsInternal(
   return slots;
 }
 
+// Public API to list slots
 export async function listAvailableSlots(input: FindSlotsInput) {
   return findAvailableSlotsInternal(input);
 }
+
+// --- BOOKING CREATION ---
 
 export async function createAutoAssignedBooking(input: CreateBookingInput) {
   const settings = await getOrCreateBookingSettings(input.organizationId);
   const timezone = input.timezone?.trim() || settings.timezone;
 
+  // Find best available slot
   const slots = await findAvailableSlotsInternal({
     organizationId: input.organizationId,
     preferredStaffId: input.preferredStaffId,
@@ -416,6 +417,7 @@ export async function createAutoAssignedBooking(input: CreateBookingInput) {
     throw new Error("No available slots in the next 14 days");
   }
 
+  // Ensure contact exists
   const contact = await upsertOrganizationContact({
     organizationId: input.organizationId,
     name: input.customerName,
@@ -427,6 +429,7 @@ export async function createAutoAssignedBooking(input: CreateBookingInput) {
     throw new Error("A booking contact name, email, or phone is required");
   }
 
+  // Create booking
   const booking = await prisma.booking.create({
     data: {
       organizationId: input.organizationId,
@@ -446,33 +449,19 @@ export async function createAutoAssignedBooking(input: CreateBookingInput) {
           : undefined,
     },
     include: {
-      contact: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-        },
-      },
-      staffProfile: {
-        select: {
-          id: true,
-          displayName: true,
-        },
-      },
+      contact: { select: { id: true, name: true, email: true, phone: true } },
+      staffProfile: { select: { id: true, displayName: true } },
     },
   });
 
+  // Fire side effects
   await Promise.all([
     createNotificationEvent({
       organizationId: input.organizationId,
       type: "booking_confirmed",
       title: "Booking confirmed",
       body: `${contact.name ?? "A customer"} booked ${input.service?.trim() || "a session"}`,
-      metadataJson: {
-        bookingId: booking.id,
-        source: input.source,
-      },
+      metadataJson: { bookingId: booking.id, source: input.source },
     }),
     createAuditLog({
       organizationId: input.organizationId,
@@ -481,9 +470,7 @@ export async function createAutoAssignedBooking(input: CreateBookingInput) {
       actorUserId: input.actorUserId,
       targetType: "booking",
       targetId: booking.id,
-      metadataJson: {
-        source: input.source,
-      },
+      metadataJson: { source: input.source },
     }),
   ]);
 
