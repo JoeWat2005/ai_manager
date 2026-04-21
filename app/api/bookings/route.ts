@@ -1,16 +1,28 @@
+// Import Clerk auth so we can check who is currently signed in
 import { auth } from "@clerk/nextjs/server";
+
+// Import audit logging helper
 import { createAuditLog } from "@/lib/dashboard/events";
+
+// Import dashboard access guard (auth + org checks for protected dashboard routes)
 import { requireDashboardApiOrg } from "@/lib/dashboard/access";
+
+// Import booking-related service helpers
 import {
   createAutoAssignedBooking,
   getOrCreateBookingSettings,
   syncBookableStaffProfiles,
 } from "@/lib/bookings/service";
+
+// Import Prisma database client
 import { prisma } from "@/lib/prisma";
+
+// Import helpers to look up organizations
 import { getOrganizationByClerkOrgId, getOrganizationBySlug } from "@/lib/reception/org";
 
+// Define expected request body for creating a booking
 type CreateBookingBody = {
-  slug?: string;
+  slug?: string; // public organization slug, used for public booking flows
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -18,23 +30,33 @@ type CreateBookingBody = {
   notes?: string;
   preferredStaffId?: string;
   preferredStaffName?: string;
-  requestedStartAt?: string;
+  requestedStartAt?: string; // date string
   source?: "manual" | "chat" | "phone" | "admin";
   timezone?: string;
 };
 
+// =====================
+// GET: Dashboard bookings overview
+// =====================
 export async function GET() {
+  // Only authenticated dashboard users with org access can use this
   const access = await requireDashboardApiOrg();
   if (!access.ok) {
     return access.response;
   }
 
+  // Load several things at the same time for better performance:
+  // 1. recent bookings
+  // 2. booking settings
+  // 3. synced staff profiles
   const [bookings, settings, staffProfiles] = await Promise.all([
     prisma.booking.findMany({
       where: {
+        // Only bookings for the current organization
         organizationId: access.organization.id,
       },
       include: {
+        // Include related contact information
         contact: {
           select: {
             id: true,
@@ -43,6 +65,7 @@ export async function GET() {
             phone: true,
           },
         },
+        // Include related staff profile information
         staffProfile: {
           select: {
             id: true,
@@ -52,14 +75,21 @@ export async function GET() {
         },
       },
       orderBy: {
+        // Show newest upcoming/latest bookings first by start time
         startAt: "desc",
       },
+      // Limit result size so this endpoint stays reasonable
       take: 300,
     }),
+
+    // Ensure booking settings exist, then return them
     getOrCreateBookingSettings(access.organization.id),
+
+    // Sync and return bookable staff profiles for this org
     syncBookableStaffProfiles(access.organization.id),
   ]);
 
+  // Return everything needed for the dashboard bookings page
   return Response.json({
     ok: true,
     bookings,
@@ -68,15 +98,20 @@ export async function GET() {
   });
 }
 
+// =====================
+// POST: Create booking
+// =====================
 export async function POST(req: Request) {
   let body: CreateBookingBody;
 
+  // Safely parse JSON body
   try {
     body = (await req.json()) as CreateBookingBody;
   } catch {
     return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // customerName is required
   const customerName = body.customerName?.trim();
   if (!customerName) {
     return Response.json(
@@ -85,13 +120,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Get current auth state from Clerk
   const authState = await auth();
+
+  // Figure out which organization this booking belongs to:
+  // - if signed in with an org, use Clerk org ID
+  // - otherwise, try public booking by slug
   const organization = authState.orgId
     ? await getOrganizationByClerkOrgId(authState.orgId)
     : body.slug?.trim()
       ? await getOrganizationBySlug(body.slug.trim())
       : null;
 
+  // If no organization can be resolved, fail
   if (!organization) {
     return Response.json(
       { ok: false, error: "Organization not found" },
@@ -99,11 +140,13 @@ export async function POST(req: Request) {
     );
   }
 
+  // Parse optional requested start time
   const requestedStartAt =
     typeof body.requestedStartAt === "string" && body.requestedStartAt.trim().length > 0
       ? new Date(body.requestedStartAt)
       : null;
 
+  // Validate date if provided
   if (requestedStartAt && Number.isNaN(requestedStartAt.getTime())) {
     return Response.json(
       { ok: false, error: "requestedStartAt must be a valid date" },
@@ -112,10 +155,21 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Create the booking using service-layer logic
+    // This likely handles:
+    // - finding/creating contact
+    // - auto-assigning staff
+    // - applying booking rules
+    // - storing metadata
     const booking = await createAutoAssignedBooking({
       organizationId: organization.id,
+
+      // userId if signed in, otherwise null for public booking flow
       actorUserId: authState.userId ?? null,
+
+      // default source is "manual" if none provided
       source: body.source ?? "manual",
+
       customerName,
       customerEmail: body.customerEmail,
       customerPhone: body.customerPhone,
@@ -125,12 +179,19 @@ export async function POST(req: Request) {
       preferredStaffName: body.preferredStaffName,
       requestedStartAt,
       timezone: body.timezone,
+
+      // Extra metadata stored with the booking
       metadataJson: {
+        // true if booking came from unauthenticated/public flow
         publicSource: !authState.userId,
+
+        // helpful for tracing where the booking came from
         slug: organization.slug,
       },
     });
 
+    // Only create an audit log when the action was performed by a signed-in user
+    // Public bookings do not have a dashboard user actor
     if (authState.userId) {
       await createAuditLog({
         organizationId: organization.id,
@@ -142,11 +203,14 @@ export async function POST(req: Request) {
       });
     }
 
+    // Return created booking
     return Response.json({
       ok: true,
       booking,
     });
   } catch (error) {
+    // If service logic rejects the booking (validation/business rule failure),
+    // return a user-friendly error message
     return Response.json(
       {
         ok: false,

@@ -1,42 +1,73 @@
+// Import access guard (checks auth + organization access)
 import { requireDashboardApiOrg } from "@/lib/dashboard/access";
+
+// Import helper to create an audit log entry (tracking changes)
 import { createAuditLog } from "@/lib/dashboard/events";
+
+// Import Prisma database client
 import { prisma } from "@/lib/prisma";
 
+// Define the expected shape of the request body
 type UpdateBookingBody = {
+  // Optional field, but if present must be one of these values
   status?: "confirmed" | "completed" | "canceled" | "no_show";
 };
 
+// Handle PATCH requests (used for updating existing data)
 export async function PATCH(
   req: Request,
+  // params comes from the dynamic route (e.g. /api/bookings/[id])
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Check authentication + organization access
   const access = await requireDashboardApiOrg();
+
+  // If access fails, return the appropriate error response
   if (!access.ok) {
     return access.response;
   }
 
+  // Extract the booking ID from route params
   const { id } = await params;
+
+  // If no ID was provided, return a 400 (bad request)
   if (!id) {
-    return Response.json({ ok: false, error: "Booking id is required" }, { status: 400 });
+    return Response.json(
+      { ok: false, error: "Booking id is required" },
+      { status: 400 }
+    );
   }
 
+  // Parse the JSON body safely
   let body: UpdateBookingBody;
   try {
     body = (await req.json()) as UpdateBookingBody;
   } catch {
-    return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
+    // If JSON parsing fails, return error
+    return Response.json(
+      { ok: false, error: "Invalid JSON body" },
+      { status: 400 }
+    );
   }
 
-  if (!body.status || !["confirmed", "completed", "canceled", "no_show"].includes(body.status)) {
+  // Validate the status field
+  // - must exist
+  // - must be one of the allowed values
+  if (
+    !body.status ||
+    !["confirmed", "completed", "canceled", "no_show"].includes(body.status)
+  ) {
     return Response.json(
       { ok: false, error: "Invalid booking status" },
       { status: 400 }
     );
   }
 
+  // Find the booking in the database
   const booking = await prisma.booking.findFirst({
     where: {
       id,
+      // Ensure booking belongs to the current organization (important security check)
       organizationId: access.organization.id,
     },
     select: {
@@ -44,18 +75,25 @@ export async function PATCH(
       status: true,
       contact: {
         select: {
-          name: true,
+          name: true, // used for audit log message
         },
       },
     },
   });
 
+  // If booking doesn't exist or doesn't belong to this org → 404
   if (!booking) {
-    return Response.json({ ok: false, error: "Booking not found" }, { status: 404 });
+    return Response.json(
+      { ok: false, error: "Booking not found" },
+      { status: 404 }
+    );
   }
 
+  // Update the booking status in the database
   const updated = await prisma.booking.update({
     where: { id: booking.id },
+
+    // Include related data to return in response
     include: {
       contact: {
         select: {
@@ -73,21 +111,35 @@ export async function PATCH(
         },
       },
     },
+
+    // Apply the new status
     data: { status: body.status },
   });
 
+  // Create an audit log entry to track this change
   await createAuditLog({
     organizationId: access.organization.id,
     action: "booking_updated",
     actorUserId: access.userId,
-    description: `Booking status changed to ${body.status} for ${booking.contact?.name ?? "unknown contact"}`,
+
+    // Human-readable description of what happened
+    description: `Booking status changed to ${body.status} for ${
+      booking.contact?.name ?? "unknown contact"
+    }`,
+
     targetType: "booking",
     targetId: booking.id,
+
+    // Store structured metadata about the change
     metadataJson: {
       previousStatus: booking.status,
       nextStatus: body.status,
     },
   });
 
-  return Response.json({ ok: true, booking: updated });
+  // Return success response with updated booking
+  return Response.json({
+    ok: true,
+    booking: updated,
+  });
 }
