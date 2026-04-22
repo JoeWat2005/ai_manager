@@ -1,24 +1,14 @@
-// Import Clerk auth so we can check who is currently signed in
 import { auth } from "@clerk/nextjs/server";
-
-// Import audit logging helper
 import { createAuditLog } from "@/lib/dashboard/events";
-
-// Import dashboard access guard (auth + org checks for protected dashboard routes)
 import { requireDashboardApiOrg } from "@/lib/dashboard/access";
-
-// Import booking-related service helpers
 import {
   createAutoAssignedBooking,
+  getBookableStaffProfiles,
   getOrCreateBookingSettings,
-  syncBookableStaffProfiles,
 } from "@/lib/bookings/service";
-
-// Import Prisma database client
 import { prisma } from "@/lib/prisma";
-
-// Import helpers to look up organizations
 import { getOrganizationByClerkOrgId, getOrganizationBySlug } from "@/lib/reception/org";
+import { startTimer } from "@/lib/perf";
 
 // Define expected request body for creating a booking
 type CreateBookingBody = {
@@ -39,16 +29,12 @@ type CreateBookingBody = {
 // GET: Dashboard bookings overview
 // =====================
 export async function GET() {
-  // Only authenticated dashboard users with org access can use this
   const access = await requireDashboardApiOrg();
   if (!access.ok) {
     return access.response;
   }
 
-  // Load several things at the same time for better performance:
-  // 1. recent bookings
-  // 2. booking settings
-  // 3. synced staff profiles
+  const endTimer = startTimer(`GET /api/bookings [org=${access.organization.id}]`);
   const [bookings, settings, staffProfiles] = await Promise.all([
     prisma.booking.findMany({
       where: {
@@ -85,11 +71,12 @@ export async function GET() {
     // Ensure booking settings exist, then return them
     getOrCreateBookingSettings(access.organization.id),
 
-    // Sync and return bookable staff profiles for this org
-    syncBookableStaffProfiles(access.organization.id),
+    // Read staff profiles (no sync on GET — sync only happens on booking creation)
+    getBookableStaffProfiles(access.organization.id),
   ]);
 
-  // Return everything needed for the dashboard bookings page
+  endTimer();
+
   return Response.json({
     ok: true,
     bookings,

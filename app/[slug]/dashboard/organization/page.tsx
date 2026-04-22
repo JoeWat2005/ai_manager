@@ -10,6 +10,63 @@ import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 import { InviteMemberForm } from "./InviteMemberForm";
 import { revokeInvitation, revokeMember } from "./actions";
 
+type CachedMember = {
+  id: string;
+  role: string;
+  publicUserData: {
+    userId: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    imageUrl: string;
+    identifier: string | null;
+  } | null;
+};
+
+type CachedInvitation = {
+  id: string;
+  emailAddress: string;
+  role: string;
+  createdAt: number;
+};
+
+// clerkClient() reads request headers internally, so these cannot be wrapped in
+// unstable_cache or "use cache". Both calls run in parallel via Promise.all below.
+async function getOrgMembers(organizationId: string): Promise<CachedMember[]> {
+  const clerk = await clerkClient();
+  const result = await clerk.organizations.getOrganizationMembershipList({
+    organizationId,
+    limit: 100,
+  });
+  return (result.data ?? []).map((m) => ({
+    id: m.id,
+    role: m.role,
+    publicUserData: m.publicUserData
+      ? {
+          userId: m.publicUserData.userId ?? null,
+          firstName: m.publicUserData.firstName ?? null,
+          lastName: m.publicUserData.lastName ?? null,
+          imageUrl: m.publicUserData.imageUrl ?? "",
+          identifier: m.publicUserData.identifier ?? null,
+        }
+      : null,
+  }));
+}
+
+async function getOrgInvitations(organizationId: string): Promise<CachedInvitation[]> {
+  const clerk = await clerkClient();
+  const result = await clerk.organizations.getOrganizationInvitationList({
+    organizationId,
+    status: ["pending"],
+    limit: 50,
+  });
+  return (result.data ?? []).map((inv) => ({
+    id: inv.id,
+    emailAddress: inv.emailAddress,
+    role: inv.role,
+    createdAt: inv.createdAt,
+  }));
+}
+
 function roleLabel(role: string) {
   if (role === "org:admin") return "Admin";
   return "Member";
@@ -24,22 +81,11 @@ export default async function OrganizationPage({
   const { organization } = await requireDashboardPageOrg(slug);
   const { orgId, userId: currentUserId } = await auth();
 
-  const clerk = await clerkClient();
-
-  const [membershipList, invitationList] = await Promise.all([
-    clerk.organizations.getOrganizationMembershipList({
-      organizationId: orgId!,
-      limit: 100,
-    }),
-    clerk.organizations.getOrganizationInvitationList({
-      organizationId: orgId!,
-      status: ["pending"],
-      limit: 50,
-    }),
+  // Both Clerk API calls run in parallel.
+  const [members, invitations] = await Promise.all([
+    getOrgMembers(orgId!),
+    getOrgInvitations(orgId!),
   ]);
-
-  const members = membershipList.data ?? [];
-  const invitations = invitationList.data ?? [];
 
   return (
     <div className="space-y-6">

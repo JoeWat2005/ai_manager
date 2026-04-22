@@ -116,26 +116,21 @@ export async function PATCH(
     data: { status: body.status },
   });
 
-  // Create an audit log entry to track this change
-  await createAuditLog({
+  // Fire audit log without awaiting — keeps it off the response critical path.
+  void createAuditLog({
     organizationId: access.organization.id,
     action: "booking_updated",
     actorUserId: access.userId,
-
-    // Human-readable description of what happened
     description: `Booking status changed to ${body.status} for ${
       booking.contact?.name ?? "unknown contact"
     }`,
-
     targetType: "booking",
     targetId: booking.id,
-
-    // Store structured metadata about the change
     metadataJson: {
       previousStatus: booking.status,
       nextStatus: body.status,
     },
-  });
+  }).catch(console.error);
 
   // Return success response with updated booking
   return Response.json({

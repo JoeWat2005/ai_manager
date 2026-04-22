@@ -1,59 +1,50 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { startTimer } from "@/lib/perf";
 
-/**
- * Fetches all data needed for the analytics page directly from the database.
- *
- * We intentionally avoid caching so the dashboard reflects real-time updates
- * (new leads, updates, calls, chats, etc.)
- */
-export async function getAnalyticsData(organizationId: string) {
-
-  // --- DEFINE TIME WINDOW (last 7 days) ---
-
+async function fetchAnalyticsData(organizationId: string) {
+  const t = startTimer(`analytics DB queries [org=${organizationId}]`);
   const windowStart = new Date();
-
-  // Reset to start of today (midnight)
   windowStart.setHours(0, 0, 0, 0);
-
-  // Go back 6 days → total window = today + 6 previous days = 7 days
   windowStart.setDate(windowStart.getDate() - 6);
 
-  // --- FETCH DATA IN PARALLEL ---
-
   const [statusGrouped, recentLeads] = await Promise.all([
-
-    // 1. GROUPED ANALYTICS (aggregated counts)
     prisma.receptionLead.groupBy({
-      by: ["status", "qualified", "channel"], // group dimensions
-      where: { organizationId },              // filter by org
-      _count: { _all: true },                 // count rows in each group
+      by: ["status", "qualified", "channel"],
+      where: { organizationId },
+      _count: { _all: true },
     }),
-
-    // 2. RECENT LEADS (time-series data)
     prisma.receptionLead.findMany({
       where: {
         organizationId,
-        createdAt: { gte: windowStart }, // only last 7 days
+        createdAt: { gte: windowStart },
       },
       select: {
         createdAt: true,
         qualified: true,
       },
-      orderBy: { createdAt: "asc" }, // needed for charts
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
-  // --- FORMAT RESPONSE ---
+  t();
 
   return {
-
-    // Aggregated counts (used for summary stats / charts)
     statusGrouped,
-
-    // Time-series data (used for charts)
     recentLeads: recentLeads.map((lead) => ({
-      createdAt: lead.createdAt.toISOString(), // convert Date → string
+      createdAt: lead.createdAt.toISOString(),
       qualified: lead.qualified,
     })),
   };
+}
+
+// Cache per org, refresh every 5 minutes.
+const getAnalyticsDataCached = unstable_cache(
+  fetchAnalyticsData,
+  ["analytics-data"],
+  { revalidate: 300 }
+);
+
+export async function getAnalyticsData(organizationId: string) {
+  return getAnalyticsDataCached(organizationId);
 }

@@ -1,24 +1,17 @@
-// Import helper that ensures the user is authenticated
-// and belongs to an organization in the reception area
-import { requireAuthedOrganization } from "@/lib/reception/auth";
-
-// Import Prisma database client
+// Lead status updates only need auth + org + paid plan — no receptionist config required.
+import { requireDashboardApiOrg } from "@/lib/dashboard/access";
+import { createAuditLog } from "@/lib/dashboard/events";
 import { prisma } from "@/lib/prisma";
 
-// Define the expected request body shape
 type LeadUpdateBody = {
-  // Allowed lead statuses
   status?: "new" | "contacted" | "closed";
 };
 
-// Handle PATCH request for updating one lead
 export async function PATCH(
   req: Request,
-  // params comes from a dynamic route like /leads/[id]
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Check auth + organization access
-  const access = await requireAuthedOrganization();
+  const access = await requireDashboardApiOrg({ requirePaidPlan: true });
   if (!access.ok) return access.response;
 
   // Extract the lead ID from the URL
@@ -51,49 +44,34 @@ export async function PATCH(
     );
   }
 
-  // Find the lead, but only if it belongs to the current organization
   const existing = await prisma.receptionLead.findFirst({
-    where: {
-      id,
-      organizationId: access.organization.id,
-    },
-    select: {
-      id: true, // only fetch ID since that's all we need here
-    },
+    where: { id, organizationId: access.organization.id },
+    select: { id: true, status: true },
   });
 
-  // If lead doesn't exist or doesn't belong to this org → 404
   if (!existing) {
-    return Response.json(
-      { ok: false, error: "Lead not found" },
-      { status: 404 }
-    );
+    return Response.json({ ok: false, error: "Lead not found" }, { status: 404 });
   }
 
-  // Update the lead status
   const lead = await prisma.receptionLead.update({
     where: { id: existing.id },
-
-    // Include related contact info in the response
     include: {
       contact: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-        },
+        select: { id: true, name: true, email: true, phone: true },
       },
     },
-
-    data: {
-      status: body.status,
-    },
+    data: { status: body.status },
   });
 
-  // Return updated lead
-  return Response.json({
-    ok: true,
-    lead,
-  });
+  void createAuditLog({
+    organizationId: access.organization.id,
+    action: "lead_status_changed",
+    actorUserId: access.userId,
+    description: `Lead status changed from ${existing.status} to ${body.status}`,
+    targetType: "lead",
+    targetId: existing.id,
+    metadataJson: { previousStatus: existing.status, nextStatus: body.status },
+  }).catch(console.error);
+
+  return Response.json({ ok: true, lead });
 }

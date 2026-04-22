@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { getEffectivePlan, isPaidPlan } from "@/lib/billing/effective-plan";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_BUSINESS_HOURS, getDefaultTimezone } from "./defaults";
@@ -137,46 +138,61 @@ export const getOrganizationByPhoneExtension = cache(
   }
 );
 
+// Inner fetch — not cached, pure DB read.
+async function fetchOrganizationByClerkOrgId(
+  clerkOrgId: string
+): Promise<OrganizationWithPlan | null> {
+  const organization = await prisma.organization.findUnique({
+    where: { clerkOrgId },
+    select: {
+      id: true,
+      clerkOrgId: true,
+      name: true,
+      slug: true,
+      subscription: {
+        select: {
+          items: {
+            select: {
+              plan: true,
+              status: true,
+              periodEnd: true,
+            },
+            orderBy: [{ periodStart: "asc" }, { id: "asc" }],
+          },
+        },
+      },
+    },
+  });
+
+  if (!organization) return null;
+
+  const items = organization.subscription?.items ?? [];
+  const plan = getEffectivePlan(items);
+
+  return {
+    id: organization.id,
+    clerkOrgId: organization.clerkOrgId,
+    name: organization.name,
+    slug: organization.slug,
+    hasPaidPlan: isPaidPlan(plan),
+    effectivePlan: plan,
+  };
+}
+
+// Cross-request cache: 30 s TTL so plan changes propagate quickly.
+// React cache() deduplicates within a single render pass on top of this.
+const fetchOrgByClerkOrgIdCached = unstable_cache(
+  fetchOrganizationByClerkOrgId,
+  ["org-by-clerk-id"],
+  { revalidate: 30, tags: ["org-lookup"] }
+);
+
 // Lookup organization by Clerk org ID
 export const getOrganizationByClerkOrgId = cache(
   async function getOrganizationByClerkOrgId(
     clerkOrgId: string
   ): Promise<OrganizationWithPlan | null> {
-    const organization = await prisma.organization.findUnique({
-      where: { clerkOrgId },
-      select: {
-        id: true,
-        clerkOrgId: true,
-        name: true,
-        slug: true,
-        subscription: {
-          select: {
-            items: {
-              select: {
-                plan: true,
-                status: true,
-                periodEnd: true,
-              },
-              orderBy: [{ periodStart: "asc" }, { id: "asc" }],
-            },
-          },
-        },
-      },
-    });
-
-    if (!organization) return null;
-
-    const items = organization.subscription?.items ?? [];
-    const plan = getEffectivePlan(items);
-
-    return {
-      id: organization.id,
-      clerkOrgId: organization.clerkOrgId,
-      name: organization.name,
-      slug: organization.slug,
-      hasPaidPlan: isPaidPlan(plan),
-      effectivePlan: plan,
-    };
+    return fetchOrgByClerkOrgIdCached(clerkOrgId);
   }
 );
 

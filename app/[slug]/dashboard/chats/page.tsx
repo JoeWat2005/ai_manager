@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
 import { prisma } from "@/lib/prisma";
+import { startTimer } from "@/lib/perf";
 import { cn } from "@/lib/utils";
 
 export default async function ChatsPage({
@@ -23,7 +24,10 @@ export default async function ChatsPage({
 }) {
   const { slug } = await params;
   const { channel, id } = await searchParams;
+
+  const tAuth = startTimer("chats auth+org");
   const { organization } = await requireDashboardPageOrg(slug);
+  tAuth();
 
   const normalizedChannel = channel === "phone" || channel === "web" ? channel : undefined;
 
@@ -31,16 +35,24 @@ export default async function ChatsPage({
   let selectedConversation: Awaited<ReturnType<typeof fetchSelectedConversation>> | null;
 
   if (id) {
+    const tParallel = startTimer(`chats parallel [org=${organization.id}]`);
     [conversations, selectedConversation] = await Promise.all([
       fetchConversationList(organization.id, normalizedChannel),
       fetchSelectedConversation(id, organization.id),
     ]);
+    tParallel();
   } else {
+    const tList = startTimer(`chats list [org=${organization.id}]`);
     conversations = await fetchConversationList(organization.id, normalizedChannel);
+    tList();
     const firstId = conversations[0]?.id;
-    selectedConversation = firstId
-      ? await fetchSelectedConversation(firstId, organization.id)
-      : null;
+    if (firstId) {
+      const tDetail = startTimer("chats detail (serial, no ?id)");
+      selectedConversation = await fetchSelectedConversation(firstId, organization.id);
+      tDetail();
+    } else {
+      selectedConversation = null;
+    }
   }
 
   return (
@@ -235,36 +247,26 @@ export default async function ChatsPage({
   );
 }
 
+// Lean list query — only fetches what the list UI actually renders.
+// Previously included callRecording (with large transcriptText) and unused lead fields.
 function fetchConversationList(organizationId: string, channel?: "phone" | "web") {
   return prisma.receptionConversation.findMany({
     where: {
       organizationId,
       ...(channel ? { channel } : {}),
     },
-    include: {
+    select: {
+      id: true,
+      channel: true,
+      outcome: true,
+      updatedAt: true,
       lead: {
         select: {
-          id: true,
-          intent: true,
-          qualified: true,
-          status: true,
           contact: {
             select: {
-              id: true,
               name: true,
-              phone: true,
-              email: true,
             },
           },
-        },
-      },
-      callRecording: {
-        select: {
-          recordingUrl: true,
-          durationSeconds: true,
-          transcriptSummary: true,
-          transcriptText: true,
-          updatedAt: true,
         },
       },
       _count: {
@@ -272,7 +274,7 @@ function fetchConversationList(organizationId: string, channel?: "phone" | "web"
       },
     },
     orderBy: { updatedAt: "desc" },
-    take: 150,
+    take: 100,
   });
 }
 
@@ -292,8 +294,17 @@ function fetchSelectedConversation(id: string, organizationId: string) {
           },
         },
       },
-      messages: { orderBy: { createdAt: "asc" } },
-      callRecording: true,
+      // Capped at 150 — conversations with hundreds of messages were causing
+      // unbounded fetches that pushed total page time above 1 second.
+      messages: { orderBy: { createdAt: "asc" }, take: 150 },
+      callRecording: {
+        select: {
+          recordingUrl: true,
+          durationSeconds: true,
+          transcriptSummary: true,
+          updatedAt: true,
+        },
+      },
     },
   });
 }

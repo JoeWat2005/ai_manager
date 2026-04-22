@@ -226,6 +226,7 @@ model ReceptionConversation {
   bookings               Booking[]
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, updatedAt])
   @@unique([provider, providerConversationId])
 }
 

@@ -1,7 +1,8 @@
 import { BookingsWorkspace } from "@/components/dashboard/BookingsWorkspace";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
-import { getOrCreateBookingSettings, syncBookableStaffProfiles } from "@/lib/bookings/service";
+import { getBookableStaffProfiles, getOrCreateBookingSettings } from "@/lib/bookings/service";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
+import { startTimer } from "@/lib/perf";
 import { prisma } from "@/lib/prisma";
 
 export default async function BookingsPage({
@@ -12,14 +13,27 @@ export default async function BookingsPage({
   const { slug } = await params;
   const { organization } = await requireDashboardPageOrg(slug);
 
+  // Show bookings from 60 days ago through 60 days ahead — avoids loading the
+  // entire booking history for orgs that have been running for months.
+  const windowStart = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+  const tData = startTimer(`bookings data [org=${organization.id}]`);
   const [settings, staffProfiles, bookings] = await Promise.all([
     getOrCreateBookingSettings(organization.id),
-    syncBookableStaffProfiles(organization.id),
+    getBookableStaffProfiles(organization.id),
     prisma.booking.findMany({
       where: {
         organizationId: organization.id,
+        startAt: { gte: windowStart, lte: windowEnd },
       },
-      include: {
+      select: {
+        id: true,
+        source: true,
+        status: true,
+        service: true,
+        startAt: true,
+        endAt: true,
         contact: {
           select: {
             id: true,
@@ -36,12 +50,11 @@ export default async function BookingsPage({
           },
         },
       },
-      orderBy: {
-        startAt: "desc",
-      },
-      take: 250,
+      orderBy: { startAt: "desc" },
+      take: 200,
     }),
   ]);
+  tData();
 
   return (
     <main className="space-y-6">
@@ -64,4 +77,3 @@ export default async function BookingsPage({
     </main>
   );
 }
-

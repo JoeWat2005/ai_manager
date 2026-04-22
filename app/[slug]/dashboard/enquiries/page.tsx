@@ -3,6 +3,7 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireDashboardPageOrg } from "@/lib/dashboard/page-access";
+import { startTimer } from "@/lib/perf";
 import { prisma } from "@/lib/prisma";
 
 export default async function EnquiriesPage({
@@ -13,27 +14,43 @@ export default async function EnquiriesPage({
   const { slug } = await params;
   const { organization } = await requireDashboardPageOrg(slug);
 
-  const contacts = await prisma.organizationContact.findMany({
-    where: { organizationId: organization.id },
-    include: {
-      receptionLeads: {
-        select: {
-          id: true,
-          channel: true,
-          intent: true,
-          status: true,
-          qualified: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const tData = startTimer(`enquiries data [org=${organization.id}]`);
 
-  const totalLeads = contacts.reduce((sum, c) => sum + c.receptionLeads.length, 0);
+  // Two parallel queries: contacts + total lead count for the org.
+  // Using select instead of include for contacts to avoid pulling createdAt/updatedAt noise.
+  const [contacts, totalLeadCount] = await Promise.all([
+    prisma.organizationContact.findMany({
+      where: { organizationId: organization.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        receptionLeads: {
+          select: {
+            id: true,
+            channel: true,
+            intent: true,
+            status: true,
+            qualified: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.receptionLead.count({
+      where: { organizationId: organization.id },
+    }),
+  ]);
+
+  tData();
+
+  const contactsWithEmail = contacts.filter((c) => c.email ?? c.phone).length;
 
   return (
     <div className="space-y-6">
@@ -57,7 +74,7 @@ export default async function EnquiriesPage({
         <Card>
           <CardHeader>
             <CardDescription className="text-xs">Total leads</CardDescription>
-            <CardTitle className="text-3xl font-black tabular-nums">{totalLeads}</CardTitle>
+            <CardTitle className="text-3xl font-black tabular-nums">{totalLeadCount}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Reception interactions logged</p>
@@ -67,7 +84,7 @@ export default async function EnquiriesPage({
           <CardHeader>
             <CardDescription className="text-xs">With contact info</CardDescription>
             <CardTitle className="text-3xl font-black tabular-nums">
-              {contacts.filter((c) => c.email ?? c.phone).length}
+              {contactsWithEmail}
             </CardTitle>
           </CardHeader>
           <CardContent>

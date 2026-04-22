@@ -19,7 +19,7 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Operations",
+    title: "General",
     items: [
       {
         label: "Dashboard",
@@ -33,6 +33,21 @@ const NAV_GROUPS: NavGroup[] = [
         ),
       },
       {
+        label: "Analytics",
+        description: "Performance trends and lead funnel",
+        href: (slug) => `/${slug}/dashboard/analytics`,
+        icon: (
+          <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
+            <path d="M5 19V9m7 10V5m7 14v-7M4 19h16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      {
         label: "Bookings",
         description: "Calendar and staff slots",
         href: (slug) => `/${slug}/dashboard/bookings`,
@@ -44,7 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Chats",
-        description: "Web + phone transcripts",
+        description: "Web and phone transcripts",
         href: (slug) => `/${slug}/dashboard/chats`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -54,7 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Leads",
-        description: "Inbound queue",
+        description: "Inbound lead queue",
         href: (slug) => `/${slug}/dashboard/leads`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -63,23 +78,23 @@ const NAV_GROUPS: NavGroup[] = [
         ),
       },
       {
-        label: "Analytics",
-        description: "Performance trends",
-        href: (slug) => `/${slug}/dashboard/analytics`,
+        label: "Enquiries",
+        description: "Contact enquiry history",
+        href: (slug) => `/${slug}/dashboard/enquiries`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
-            <path d="M5 19V9m7 10V5m7 14v-7M4 19h16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M4 7h16M4 7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M4 7l8-4 8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         ),
       },
     ],
   },
   {
-    title: "Growth",
+    title: "Customisation",
     items: [
       {
-        label: "Links",
-        description: "Linktree-style profile",
+        label: "Links page",
+        description: "Linktree-style public profile builder",
         href: (slug) => `/${slug}/dashboard/links`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -88,22 +103,12 @@ const NAV_GROUPS: NavGroup[] = [
         ),
       },
       {
-        label: "Customization",
-        description: "Landing and links styling",
+        label: "Landing page",
+        description: "Landing page copy and styling",
         href: (slug) => `/${slug}/dashboard/customization`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
             <path d="M12 3.5a8.5 8.5 0 1 0 0 17 2.5 2.5 0 0 0 0-5h-.5a2 2 0 0 1 0-4h3A3.5 3.5 0 0 0 18 8a4.5 4.5 0 0 0-6-4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        ),
-      },
-      {
-        label: "Billing",
-        description: "Plans and upgrades",
-        href: (slug) => `/${slug}/dashboard/billing`,
-        icon: (
-          <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
-            <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9ZM3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
         ),
       },
@@ -113,8 +118,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: "Administration",
     items: [
       {
-        label: "Organization",
-        description: "Members and invites",
+        label: "Organisation",
+        description: "Team members and invites",
         href: (slug) => `/${slug}/dashboard/organization`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -124,7 +129,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Notifications",
-        description: "Operational events",
+        description: "Operational event log",
         href: (slug) => `/${slug}/dashboard/notifications`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -133,8 +138,8 @@ const NAV_GROUPS: NavGroup[] = [
         ),
       },
       {
-        label: "Audit",
-        description: "Security activity log",
+        label: "Audit log",
+        description: "Security and access activity",
         href: (slug) => `/${slug}/dashboard/audit`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
@@ -144,12 +149,38 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Settings",
-        description: "Business and access",
+        description: "Workspace and receptionist config",
         href: (slug) => `/${slug}/dashboard/settings`,
         icon: (
           <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
             <path d="M10.5 4.75h3l.7 1.9a1 1 0 0 0 .86.65l2.03.17 1.5 2.6-1.34 1.54a1 1 0 0 0-.22 1.03l.64 1.96-2.14 1.8-1.82-.95a1 1 0 0 0-1.05.08L12 16.78l-1.66-1.2a1 1 0 0 0-1.04-.08l-1.82.95-2.15-1.8.65-1.96a1 1 0 0 0-.22-1.03L4.4 10.1l1.5-2.6 2.03-.17a1 1 0 0 0 .86-.65l.71-1.9Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
             <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    title: "Billing",
+    items: [
+      {
+        label: "Billing",
+        description: "Plan and subscription management",
+        href: (slug) => `/${slug}/dashboard/billing`,
+        exact: true,
+        icon: (
+          <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
+            <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9ZM3 10h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: "Invoices",
+        description: "Billing history and payment records",
+        href: (slug) => `/${slug}/dashboard/billing/invoices`,
+        icon: (
+          <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden="true">
+            <path d="M9 7h6m-6 4h6m-6 4h4M6 3h12a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2-3-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         ),
       },
@@ -165,7 +196,7 @@ export function DashboardSidebarNav({ slug }: { slug: string }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-5">
+    <nav className="flex flex-col gap-4">
       {NAV_GROUPS.map((group) => (
         <div key={group.title}>
           <p className="mb-1.5 px-2 text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
@@ -194,17 +225,7 @@ export function DashboardSidebarNav({ slug }: { slug: string }) {
                     >
                       {item.icon}
                     </span>
-                    <span>
-                      <span className="block font-medium leading-tight">{item.label}</span>
-                      <span
-                        className={[
-                          "block text-[11px] leading-tight",
-                          active ? "text-primary-foreground/75" : "text-muted-foreground",
-                        ].join(" ")}
-                      >
-                        {item.description}
-                      </span>
-                    </span>
+                    <span className="font-medium leading-tight">{item.label}</span>
                   </Link>
                 </li>
               );

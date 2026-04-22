@@ -294,6 +294,32 @@ export async function syncBookableStaffProfiles(organizationId: string) {
   });
 }
 
+// Read-only staff profile fetch — no writes, no membership sync.
+// Use this for list views and availability checks; reserve syncBookableStaffProfiles for booking creation.
+export async function getBookableStaffProfiles(organizationId: string) {
+  return prisma.bookableStaffProfile.findMany({
+    where: { organizationId },
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      timezone: true,
+      bookable: true,
+      priority: true,
+      availabilities: {
+        select: {
+          id: true,
+          weekday: true,
+          startMinutes: true,
+          endMinutes: true,
+          isEnabled: true,
+        },
+      },
+    },
+    orderBy: [{ priority: "asc" }, { displayName: "asc" }],
+  });
+}
+
 // Fetch existing bookings to detect conflicts
 async function getBookingConflicts(
   organizationId: string,
@@ -317,15 +343,21 @@ async function getBookingConflicts(
 
 // --- SLOT FINDING ENGINE (CORE LOGIC) ---
 
+type SlotPreload = {
+  settings?: { timezone: string; slotLengthMinutes: number; openingHoursJson: unknown };
+  staffProfiles?: StaffProfile[];
+};
+
 async function findAvailableSlotsInternal(
-  input: FindSlotsInput
+  input: FindSlotsInput,
+  preload: SlotPreload = {}
 ): Promise<AvailableSlot[]> {
-  const settings = await getOrCreateBookingSettings(input.organizationId);
+  const settings = preload.settings ?? await getOrCreateBookingSettings(input.organizationId);
   const timezone = input.timezone ?? settings.timezone;
   const slotLengthMinutes = Math.max(settings.slotLengthMinutes, 15);
   const openingHours = normalizeBusinessHours(settings.openingHoursJson);
 
-  const staffProfiles = await syncBookableStaffProfiles(input.organizationId);
+  const staffProfiles = preload.staffProfiles ?? await getBookableStaffProfiles(input.organizationId);
   const bookableStaff = staffProfiles.filter((s) => s.bookable);
 
   if (bookableStaff.length === 0) return [];
@@ -392,25 +424,37 @@ async function findAvailableSlotsInternal(
   return slots;
 }
 
-// Public API to list slots
+// Public API to list slots — preloads settings + staff in parallel using read-only staff fetch.
 export async function listAvailableSlots(input: FindSlotsInput) {
-  return findAvailableSlotsInternal(input);
+  const [settings, staffProfiles] = await Promise.all([
+    getOrCreateBookingSettings(input.organizationId),
+    getBookableStaffProfiles(input.organizationId),
+  ]);
+  return findAvailableSlotsInternal(input, { settings, staffProfiles });
 }
 
 // --- BOOKING CREATION ---
 
 export async function createAutoAssignedBooking(input: CreateBookingInput) {
-  const settings = await getOrCreateBookingSettings(input.organizationId);
+  // Preload settings and sync staff in parallel — eliminates the double settings fetch
+  // that previously happened inside findAvailableSlotsInternal.
+  const [settings, staffProfiles] = await Promise.all([
+    getOrCreateBookingSettings(input.organizationId),
+    syncBookableStaffProfiles(input.organizationId),
+  ]);
   const timezone = input.timezone?.trim() || settings.timezone;
 
-  // Find best available slot
-  const slots = await findAvailableSlotsInternal({
-    organizationId: input.organizationId,
-    preferredStaffId: input.preferredStaffId,
-    startFrom: input.requestedStartAt ?? new Date(),
-    timezone,
-    limit: 1,
-  });
+  // Find best available slot using preloaded data (no extra DB fetches inside)
+  const slots = await findAvailableSlotsInternal(
+    {
+      organizationId: input.organizationId,
+      preferredStaffId: input.preferredStaffId,
+      startFrom: input.requestedStartAt ?? new Date(),
+      timezone,
+      limit: 1,
+    },
+    { settings, staffProfiles }
+  );
 
   const bestSlot = slots[0];
   if (!bestSlot) {

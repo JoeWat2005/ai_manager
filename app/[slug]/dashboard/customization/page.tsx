@@ -20,7 +20,7 @@ export default async function DashboardCustomizationPage({
     <main className="space-y-6">
       <DashboardPageHeader
         eyebrow="Customization"
-        title="Landing and links styling"
+        title="Landing styling"
         description="Curated page controls for copy, CTA labels, and accent styling."
       />
 
